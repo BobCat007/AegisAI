@@ -18,6 +18,7 @@ FEATURE_NAMES = [
     "has_sensitive_parameters",
     "parameter_count",
     "path_depth",
+    "has_request_body",
     "method_get",
     "method_post",
     "method_put",
@@ -94,6 +95,9 @@ def extract_risk_features(
         ),
         "path_depth": float(
             calculate_path_depth(endpoint.path)
+        ),
+        "has_request_body": float(
+            endpoint.request_body is not None
         ),
     }
 

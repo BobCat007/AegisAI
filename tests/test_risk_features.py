@@ -50,6 +50,15 @@ def test_extract_risk_features():
                 "in": "query",
             },
         ],
+        request_body={
+            "content": {
+                "application/json": {
+                    "schema": {
+                        "type": "object",
+                    }
+                }
+            }
+        },
         security_classification=SecurityClassification(
             is_authenticated=True,
             is_destructive=True,
@@ -70,6 +79,7 @@ def test_extract_risk_features():
         "has_sensitive_parameters": 1.0,
         "parameter_count": 2.0,
         "path_depth": 2.0,
+        "has_request_body": 1.0,
         "method_get": 0.0,
         "method_post": 0.0,
         "method_put": 0.0,
@@ -98,6 +108,7 @@ def test_extract_features_from_low_risk_endpoint():
         "has_sensitive_parameters": 0.0,
         "parameter_count": 0.0,
         "path_depth": 1.0,
+        "has_request_body": 0.0,
         "method_get": 1.0,
         "method_post": 0.0,
         "method_put": 0.0,
@@ -121,6 +132,15 @@ def test_feature_vector_order():
                 "in": "query",
             },
         ],
+        request_body={
+            "content": {
+                "application/json": {
+                    "schema": {
+                        "type": "object",
+                    }
+                }
+            }
+        },
         security_classification=SecurityClassification(
             is_authenticated=True,
             is_destructive=True,
@@ -140,6 +160,7 @@ def test_feature_vector_order():
         "has_sensitive_parameters",
         "parameter_count",
         "path_depth",
+        "has_request_body",
         "method_get",
         "method_post",
         "method_put",
@@ -155,6 +176,7 @@ def test_feature_vector_order():
         1.0,
         2.0,
         2.0,
+        1.0,
         0.0,
         0.0,
         0.0,
