@@ -66,4 +66,5 @@ def test_risk_assessment_endpoint():
         1.0,
         0.0,
         0.0,
+        0.0,
     ]

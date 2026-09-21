@@ -7,6 +7,7 @@ FEATURE_NAMES = [
     "has_path_parameters",
     "is_authentication_endpoint",
     "has_sensitive_parameters",
+    "parameter_count",
 ]
 
 
@@ -36,6 +37,9 @@ def extract_risk_features(
         ),
         "has_sensitive_parameters": float(
             classification.has_sensitive_parameters
+        ),
+        "parameter_count": float(
+            len(endpoint.parameters)
         ),
     }
 
