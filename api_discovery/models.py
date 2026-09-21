@@ -16,6 +16,7 @@ class SecurityClassification(BaseModel):
 class APIEndpoint(BaseModel):
     path: str
     method: str
+    operation_category: str
     operation_id: str | None = None
     summary: str | None = None
     description: str | None = None

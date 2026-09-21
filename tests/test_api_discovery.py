@@ -163,3 +163,34 @@ def test_sensitive_parameter_detection():
         login_endpoint.security_classification.sensitive_parameters
         == ["password"]
     )
+
+
+def test_operation_categories():
+    spec = load_fixture()
+
+    inventory = discover_api(spec)
+
+    list_users = next(
+        endpoint
+        for endpoint in inventory.endpoints
+        if endpoint.path == "/users"
+        and endpoint.method == "GET"
+    )
+
+    create_user = next(
+        endpoint
+        for endpoint in inventory.endpoints
+        if endpoint.path == "/users"
+        and endpoint.method == "POST"
+    )
+
+    delete_user = next(
+        endpoint
+        for endpoint in inventory.endpoints
+        if endpoint.path == "/users/{user_id}"
+        and endpoint.method == "DELETE"
+    )
+
+    assert list_users.operation_category == "read"
+    assert create_user.operation_category == "create/action"
+    assert delete_user.operation_category == "delete"

@@ -30,6 +30,22 @@ SENSITIVE_PARAMETER_NAMES = {
 }
 
 
+def get_operation_category(method: str) -> str:
+    """
+    Convert an HTTP method into a high-level operation category.
+    """
+
+    categories = {
+        "GET": "read",
+        "POST": "create/action",
+        "PUT": "update",
+        "PATCH": "update",
+        "DELETE": "delete",
+    }
+
+    return categories.get(method, "other")
+
+
 def classify_endpoint(
     path: str,
     method: str,
@@ -146,16 +162,21 @@ def parse_openapi_spec(spec: dict[str, Any]) -> list[APIEndpoint]:
                 spec.get("security", []),
             )
 
+            normalized_method = method_lower.upper()
+
             security_classification = classify_endpoint(
                 path=path,
-                method=method_lower.upper(),
+                method=normalized_method,
                 security=security,
                 parameters=parameters,
             )
 
             endpoint = APIEndpoint(
                 path=path,
-                method=method_lower.upper(),
+                method=normalized_method,
+                operation_category=get_operation_category(
+                    normalized_method
+                ),
                 operation_id=operation.get("operationId"),
                 summary=operation.get("summary"),
                 description=operation.get("description"),
