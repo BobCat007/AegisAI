@@ -4,6 +4,7 @@ from risk_engine.features import (
     calculate_path_depth,
     extract_feature_vector,
     extract_method_features,
+    extract_parameter_location_features,
     extract_risk_features,
 )
 
@@ -35,6 +36,40 @@ def test_extract_method_features():
     }
 
 
+def test_extract_parameter_location_features():
+    endpoint = APIEndpoint(
+        path="/users/{user_id}",
+        method="GET",
+        operation_category="read",
+        parameters=[
+            {
+                "name": "user_id",
+                "in": "path",
+            },
+            {
+                "name": "search",
+                "in": "query",
+            },
+            {
+                "name": "limit",
+                "in": "query",
+            },
+            {
+                "name": "X-API-Key",
+                "in": "header",
+            },
+        ],
+    )
+
+    features = extract_parameter_location_features(endpoint)
+
+    assert features == {
+        "path_parameter_count": 1.0,
+        "query_parameter_count": 2.0,
+        "header_parameter_count": 1.0,
+    }
+
+
 def test_extract_risk_features():
     endpoint = APIEndpoint(
         path="/users/{user_id}",
@@ -48,6 +83,10 @@ def test_extract_risk_features():
             {
                 "name": "password",
                 "in": "query",
+            },
+            {
+                "name": "X-API-Key",
+                "in": "header",
             },
         ],
         request_body={
@@ -77,9 +116,12 @@ def test_extract_risk_features():
         "has_path_parameters": 1.0,
         "is_authentication_endpoint": 0.0,
         "has_sensitive_parameters": 1.0,
-        "parameter_count": 2.0,
+        "parameter_count": 3.0,
         "path_depth": 2.0,
         "has_request_body": 1.0,
+        "path_parameter_count": 1.0,
+        "query_parameter_count": 1.0,
+        "header_parameter_count": 1.0,
         "method_get": 0.0,
         "method_post": 0.0,
         "method_put": 0.0,
@@ -109,6 +151,9 @@ def test_extract_features_from_low_risk_endpoint():
         "parameter_count": 0.0,
         "path_depth": 1.0,
         "has_request_body": 0.0,
+        "path_parameter_count": 0.0,
+        "query_parameter_count": 0.0,
+        "header_parameter_count": 0.0,
         "method_get": 1.0,
         "method_post": 0.0,
         "method_put": 0.0,
@@ -130,6 +175,10 @@ def test_feature_vector_order():
             {
                 "name": "password",
                 "in": "query",
+            },
+            {
+                "name": "X-API-Key",
+                "in": "header",
             },
         ],
         request_body={
@@ -161,6 +210,9 @@ def test_feature_vector_order():
         "parameter_count",
         "path_depth",
         "has_request_body",
+        "path_parameter_count",
+        "query_parameter_count",
+        "header_parameter_count",
         "method_get",
         "method_post",
         "method_put",
@@ -174,8 +226,11 @@ def test_feature_vector_order():
         1.0,
         0.0,
         1.0,
+        3.0,
         2.0,
-        2.0,
+        1.0,
+        1.0,
+        1.0,
         1.0,
         0.0,
         0.0,

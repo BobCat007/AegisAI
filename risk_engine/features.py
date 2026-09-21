@@ -19,6 +19,9 @@ FEATURE_NAMES = [
     "parameter_count",
     "path_depth",
     "has_request_body",
+    "path_parameter_count",
+    "query_parameter_count",
+    "header_parameter_count",
     "method_get",
     "method_post",
     "method_put",
@@ -63,6 +66,35 @@ def extract_method_features(
     }
 
 
+def extract_parameter_location_features(
+    endpoint: APIEndpoint,
+) -> dict[str, float]:
+    """
+    Count parameters according to their location.
+    """
+
+    counts = {
+        "path_parameter_count": 0.0,
+        "query_parameter_count": 0.0,
+        "header_parameter_count": 0.0,
+    }
+
+    for parameter in endpoint.parameters:
+        if not isinstance(parameter, dict):
+            continue
+
+        location = parameter.get("in")
+
+        if location == "path":
+            counts["path_parameter_count"] += 1.0
+        elif location == "query":
+            counts["query_parameter_count"] += 1.0
+        elif location == "header":
+            counts["header_parameter_count"] += 1.0
+
+    return counts
+
+
 def extract_risk_features(
     endpoint: APIEndpoint,
 ) -> dict[str, float]:
@@ -100,6 +132,10 @@ def extract_risk_features(
             endpoint.request_body is not None
         ),
     }
+
+    features.update(
+        extract_parameter_location_features(endpoint)
+    )
 
     features.update(
         extract_method_features(endpoint.method)
