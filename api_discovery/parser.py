@@ -15,10 +15,26 @@ HTTP_METHODS = {
 }
 
 
+SENSITIVE_PARAMETER_NAMES = {
+    "password",
+    "passwd",
+    "pass",
+    "secret",
+    "token",
+    "api_key",
+    "apikey",
+    "authorization",
+    "access_token",
+    "refresh_token",
+    "client_secret",
+}
+
+
 def classify_endpoint(
     path: str,
     method: str,
     security: list[dict[str, Any]],
+    parameters: list[dict[str, Any]],
 ) -> SecurityClassification:
     """
     Classify an API endpoint using security characteristics.
@@ -50,6 +66,24 @@ def classify_endpoint(
         for keyword in authentication_keywords
     )
 
+    sensitive_parameters: list[str] = []
+
+    for parameter in parameters:
+        if not isinstance(parameter, dict):
+            continue
+
+        parameter_name = parameter.get("name")
+
+        if not isinstance(parameter_name, str):
+            continue
+
+        normalized_name = parameter_name.lower().strip()
+
+        if normalized_name in SENSITIVE_PARAMETER_NAMES:
+            sensitive_parameters.append(parameter_name)
+
+    has_sensitive_parameters = bool(sensitive_parameters)
+
     if is_authenticated:
         indicators.append("Authentication required")
 
@@ -62,11 +96,16 @@ def classify_endpoint(
     if is_authentication_endpoint:
         indicators.append("Authentication-related endpoint")
 
+    if has_sensitive_parameters:
+        indicators.append("Sensitive parameter detected")
+
     return SecurityClassification(
         is_authenticated=is_authenticated,
         is_destructive=is_destructive,
         has_path_parameters=has_path_parameters,
         is_authentication_endpoint=is_authentication_endpoint,
+        has_sensitive_parameters=has_sensitive_parameters,
+        sensitive_parameters=sensitive_parameters,
         risk_indicators=indicators,
     )
 
@@ -111,6 +150,7 @@ def parse_openapi_spec(spec: dict[str, Any]) -> list[APIEndpoint]:
                 path=path,
                 method=method_lower.upper(),
                 security=security,
+                parameters=parameters,
             )
 
             endpoint = APIEndpoint(

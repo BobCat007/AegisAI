@@ -36,6 +36,16 @@
           {
             "bearerAuth": []
           }
+        ],
+        "parameters": [
+          {
+            "name": "password",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
         ]
       }
     },
@@ -81,6 +91,16 @@
         "operationId": "login",
         "tags": [
           "Authentication"
+        ],
+        "parameters": [
+          {
+            "name": "password",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
         ],
         "security": []
       }

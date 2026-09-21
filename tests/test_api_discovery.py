@@ -118,3 +118,48 @@ def test_authentication_detection():
     )
 
     assert login_endpoint.security_classification.is_authenticated is False
+
+
+def test_sensitive_parameter_detection():
+    spec = load_fixture()
+
+    inventory = discover_api(spec)
+
+    create_user_endpoint = next(
+        endpoint
+        for endpoint in inventory.endpoints
+        if endpoint.path == "/users"
+        and endpoint.method == "POST"
+    )
+
+    login_endpoint = next(
+        endpoint
+        for endpoint in inventory.endpoints
+        if endpoint.path == "/auth/login"
+        and endpoint.method == "POST"
+    )
+
+    assert (
+        create_user_endpoint.security_classification.has_sensitive_parameters
+        is True
+    )
+
+    assert (
+        create_user_endpoint.security_classification.sensitive_parameters
+        == ["password"]
+    )
+
+    assert (
+        "Sensitive parameter detected"
+        in create_user_endpoint.security_classification.risk_indicators
+    )
+
+    assert (
+        login_endpoint.security_classification.has_sensitive_parameters
+        is True
+    )
+
+    assert (
+        login_endpoint.security_classification.sensitive_parameters
+        == ["password"]
+    )
