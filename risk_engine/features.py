@@ -1,3 +1,5 @@
+from typing import Any
+
 from api_discovery.models import APIEndpoint
 
 
@@ -22,6 +24,7 @@ FEATURE_NAMES = [
     "path_parameter_count",
     "query_parameter_count",
     "header_parameter_count",
+    "request_body_property_count",
     "method_get",
     "method_post",
     "method_put",
@@ -95,6 +98,45 @@ def extract_parameter_location_features(
     return counts
 
 
+def calculate_request_body_property_count(
+    request_body: dict[str, Any] | None,
+) -> int:
+    """
+    Count top-level properties in the request body schema.
+
+    The function checks the first available media type under
+    requestBody.content and counts properties defined directly
+    on its schema.
+
+    Returns 0 when the request body or schema does not define
+    object properties.
+    """
+
+    if not isinstance(request_body, dict):
+        return 0
+
+    content = request_body.get("content")
+
+    if not isinstance(content, dict):
+        return 0
+
+    for media_type in content.values():
+        if not isinstance(media_type, dict):
+            continue
+
+        schema = media_type.get("schema")
+
+        if not isinstance(schema, dict):
+            continue
+
+        properties = schema.get("properties")
+
+        if isinstance(properties, dict):
+            return len(properties)
+
+    return 0
+
+
 def extract_risk_features(
     endpoint: APIEndpoint,
 ) -> dict[str, float]:
@@ -130,6 +172,11 @@ def extract_risk_features(
         ),
         "has_request_body": float(
             endpoint.request_body is not None
+        ),
+        "request_body_property_count": float(
+            calculate_request_body_property_count(
+                endpoint.request_body
+            )
         ),
     }
 

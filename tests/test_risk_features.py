@@ -2,6 +2,7 @@ from api_discovery.models import APIEndpoint, SecurityClassification
 from risk_engine.features import (
     FEATURE_NAMES,
     calculate_path_depth,
+    calculate_request_body_property_count,
     extract_feature_vector,
     extract_method_features,
     extract_parameter_location_features,
@@ -70,6 +71,52 @@ def test_extract_parameter_location_features():
     }
 
 
+def test_calculate_request_body_property_count():
+    request_body = {
+        "content": {
+            "application/json": {
+                "schema": {
+                    "type": "object",
+                    "properties": {
+                        "username": {
+                            "type": "string",
+                        },
+                        "email": {
+                            "type": "string",
+                        },
+                        "password": {
+                            "type": "string",
+                        },
+                        "role": {
+                            "type": "string",
+                        },
+                    },
+                }
+            }
+        }
+    }
+
+    assert calculate_request_body_property_count(
+        request_body
+    ) == 4
+
+
+def test_request_body_property_count_without_properties():
+    request_body = {
+        "content": {
+            "application/json": {
+                "schema": {
+                    "type": "string",
+                }
+            }
+        }
+    }
+
+    assert calculate_request_body_property_count(
+        request_body
+    ) == 0
+
+
 def test_extract_risk_features():
     endpoint = APIEndpoint(
         path="/users/{user_id}",
@@ -94,6 +141,17 @@ def test_extract_risk_features():
                 "application/json": {
                     "schema": {
                         "type": "object",
+                        "properties": {
+                            "username": {
+                                "type": "string",
+                            },
+                            "email": {
+                                "type": "string",
+                            },
+                            "password": {
+                                "type": "string",
+                            },
+                        },
                     }
                 }
             }
@@ -122,6 +180,7 @@ def test_extract_risk_features():
         "path_parameter_count": 1.0,
         "query_parameter_count": 1.0,
         "header_parameter_count": 1.0,
+        "request_body_property_count": 3.0,
         "method_get": 0.0,
         "method_post": 0.0,
         "method_put": 0.0,
@@ -154,6 +213,7 @@ def test_extract_features_from_low_risk_endpoint():
         "path_parameter_count": 0.0,
         "query_parameter_count": 0.0,
         "header_parameter_count": 0.0,
+        "request_body_property_count": 0.0,
         "method_get": 1.0,
         "method_post": 0.0,
         "method_put": 0.0,
@@ -186,6 +246,14 @@ def test_feature_vector_order():
                 "application/json": {
                     "schema": {
                         "type": "object",
+                        "properties": {
+                            "username": {
+                                "type": "string",
+                            },
+                            "email": {
+                                "type": "string",
+                            },
+                        },
                     }
                 }
             }
@@ -213,6 +281,7 @@ def test_feature_vector_order():
         "path_parameter_count",
         "query_parameter_count",
         "header_parameter_count",
+        "request_body_property_count",
         "method_get",
         "method_post",
         "method_put",
@@ -232,6 +301,7 @@ def test_feature_vector_order():
         1.0,
         1.0,
         1.0,
+        2.0,
         0.0,
         0.0,
         0.0,
