@@ -4,6 +4,14 @@
     "title": "AegisAI Demo API",
     "version": "1.0.0"
   },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer"
+      }
+    }
+  },
   "paths": {
     "/users": {
       "get": {
@@ -11,6 +19,11 @@
         "operationId": "listUsers",
         "tags": [
           "Users"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
         ]
       },
       "post": {
@@ -18,6 +31,11 @@
         "operationId": "createUser",
         "tags": [
           "Users"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
         ]
       }
     },
@@ -37,6 +55,11 @@
               "type": "string"
             }
           }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
         ]
       },
       "delete": {
@@ -44,6 +67,11 @@
         "operationId": "deleteUser",
         "tags": [
           "Users"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
         ]
       }
     },
@@ -53,7 +81,8 @@
         "operationId": "login",
         "tags": [
           "Authentication"
-        ]
+        ],
+        "security": []
       }
     }
   }

@@ -90,3 +90,31 @@ def test_security_classification():
         login_endpoint.security_classification.is_authentication_endpoint
         is True
     )
+
+
+def test_authentication_detection():
+    spec = load_fixture()
+
+    inventory = discover_api(spec)
+
+    users_endpoint = next(
+        endpoint
+        for endpoint in inventory.endpoints
+        if endpoint.path == "/users"
+        and endpoint.method == "GET"
+    )
+
+    login_endpoint = next(
+        endpoint
+        for endpoint in inventory.endpoints
+        if endpoint.path == "/auth/login"
+        and endpoint.method == "POST"
+    )
+
+    assert users_endpoint.security_classification.is_authenticated is True
+    assert (
+        "Authentication required"
+        in users_endpoint.security_classification.risk_indicators
+    )
+
+    assert login_endpoint.security_classification.is_authenticated is False

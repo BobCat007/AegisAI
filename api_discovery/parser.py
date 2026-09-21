@@ -21,7 +21,7 @@ def classify_endpoint(
     security: list[dict[str, Any]],
 ) -> SecurityClassification:
     """
-    Classify an API endpoint using basic security characteristics.
+    Classify an API endpoint using security characteristics.
     """
 
     indicators: list[str] = []
