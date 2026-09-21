@@ -1,9 +1,19 @@
 from api_discovery.models import APIEndpoint, SecurityClassification
 from risk_engine.features import (
     FEATURE_NAMES,
+    calculate_path_depth,
     extract_feature_vector,
     extract_risk_features,
 )
+
+
+def test_calculate_path_depth():
+    assert calculate_path_depth("/health") == 1
+    assert calculate_path_depth("/users") == 1
+    assert calculate_path_depth("/users/{user_id}") == 2
+    assert calculate_path_depth(
+        "/admin/users/{user_id}/keys"
+    ) == 4
 
 
 def test_extract_risk_features():
@@ -40,6 +50,7 @@ def test_extract_risk_features():
         "is_authentication_endpoint": 0.0,
         "has_sensitive_parameters": 1.0,
         "parameter_count": 2.0,
+        "path_depth": 2.0,
     }
 
 
@@ -62,6 +73,7 @@ def test_extract_features_from_low_risk_endpoint():
         "is_authentication_endpoint": 0.0,
         "has_sensitive_parameters": 0.0,
         "parameter_count": 0.0,
+        "path_depth": 1.0,
     }
 
 
@@ -98,6 +110,15 @@ def test_feature_vector_order():
         "is_authentication_endpoint",
         "has_sensitive_parameters",
         "parameter_count",
+        "path_depth",
     ]
 
-    assert vector == [1.0, 1.0, 1.0, 0.0, 1.0, 2.0]
+    assert vector == [
+        1.0,
+        1.0,
+        1.0,
+        0.0,
+        1.0,
+        2.0,
+        2.0,
+    ]

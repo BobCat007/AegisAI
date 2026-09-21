@@ -8,7 +8,27 @@ FEATURE_NAMES = [
     "is_authentication_endpoint",
     "has_sensitive_parameters",
     "parameter_count",
+    "path_depth",
 ]
+
+
+def calculate_path_depth(path: str) -> int:
+    """
+    Calculate the number of meaningful path segments.
+
+    Example:
+        /health -> 1
+        /users/{user_id} -> 2
+        /admin/users/{user_id}/keys -> 4
+    """
+
+    return len(
+        [
+            segment
+            for segment in path.strip("/").split("/")
+            if segment
+        ]
+    )
 
 
 def extract_risk_features(
@@ -40,6 +60,9 @@ def extract_risk_features(
         ),
         "parameter_count": float(
             len(endpoint.parameters)
+        ),
+        "path_depth": float(
+            calculate_path_depth(endpoint.path)
         ),
     }
 
