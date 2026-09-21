@@ -1,0 +1,60 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "AegisAI Demo API",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/users": {
+      "get": {
+        "summary": "List users",
+        "operationId": "listUsers",
+        "tags": [
+          "Users"
+        ]
+      },
+      "post": {
+        "summary": "Create user",
+        "operationId": "createUser",
+        "tags": [
+          "Users"
+        ]
+      }
+    },
+    "/users/{user_id}": {
+      "get": {
+        "summary": "Get user",
+        "operationId": "getUser",
+        "tags": [
+          "Users"
+        ],
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      },
+      "delete": {
+        "summary": "Delete user",
+        "operationId": "deleteUser",
+        "tags": [
+          "Users"
+        ]
+      }
+    },
+    "/auth/login": {
+      "post": {
+        "summary": "User login",
+        "operationId": "login",
+        "tags": [
+          "Authentication"
+        ]
+      }
+    }
+  }
+}
