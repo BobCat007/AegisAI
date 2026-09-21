@@ -1,6 +1,15 @@
 from api_discovery.models import APIEndpoint
 
 
+HTTP_METHODS = [
+    "GET",
+    "POST",
+    "PUT",
+    "PATCH",
+    "DELETE",
+]
+
+
 FEATURE_NAMES = [
     "is_authenticated",
     "is_destructive",
@@ -9,6 +18,11 @@ FEATURE_NAMES = [
     "has_sensitive_parameters",
     "parameter_count",
     "path_depth",
+    "method_get",
+    "method_post",
+    "method_put",
+    "method_patch",
+    "method_delete",
 ]
 
 
@@ -31,6 +45,23 @@ def calculate_path_depth(path: str) -> int:
     )
 
 
+def extract_method_features(
+    method: str,
+) -> dict[str, float]:
+    """
+    Convert an HTTP method into one-hot encoded features.
+    """
+
+    normalized_method = method.upper()
+
+    return {
+        f"method_{http_method.lower()}": float(
+            normalized_method == http_method
+        )
+        for http_method in HTTP_METHODS
+    }
+
+
 def extract_risk_features(
     endpoint: APIEndpoint,
 ) -> dict[str, float]:
@@ -42,7 +73,7 @@ def extract_risk_features(
 
     classification = endpoint.security_classification
 
-    return {
+    features = {
         "is_authenticated": float(
             classification.is_authenticated
         ),
@@ -65,6 +96,12 @@ def extract_risk_features(
             calculate_path_depth(endpoint.path)
         ),
     }
+
+    features.update(
+        extract_method_features(endpoint.method)
+    )
+
+    return features
 
 
 def extract_feature_vector(
