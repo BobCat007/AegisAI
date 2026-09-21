@@ -12,3 +12,4 @@ class RiskAssessment(BaseModel):
     severity: str
     reasons: list[str] = Field(default_factory=list)
     risk_factors: list[RiskFactor] = Field(default_factory=list)
+    feature_vector: list[float] = Field(default_factory=list)

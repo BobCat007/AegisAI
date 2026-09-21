@@ -1,4 +1,5 @@
 from api_discovery.models import APIEndpoint
+from risk_engine.features import extract_feature_vector
 from risk_engine.models import RiskAssessment, RiskFactor
 
 
@@ -73,9 +74,12 @@ def calculate_risk(endpoint: APIEndpoint) -> RiskAssessment:
     else:
         severity = "low"
 
+    feature_vector = extract_feature_vector(endpoint)
+
     return RiskAssessment(
         score=score,
         severity=severity,
         reasons=reasons,
         risk_factors=risk_factors,
+        feature_vector=feature_vector,
     )

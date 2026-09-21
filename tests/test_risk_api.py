@@ -59,3 +59,11 @@ def test_risk_assessment_endpoint():
     assert factors["sensitive_parameter"]["triggered"] is False
     assert factors["authentication_endpoint"]["triggered"] is False
     assert factors["missing_authentication"]["triggered"] is False
+
+    assert assessment["feature_vector"] == [
+        1.0,
+        1.0,
+        1.0,
+        0.0,
+        0.0,
+    ]
