@@ -55,3 +55,38 @@ def test_http_methods():
     assert "GET" in methods
     assert "POST" in methods
     assert "DELETE" in methods
+
+
+def test_security_classification():
+    spec = load_fixture()
+
+    inventory = discover_api(spec)
+
+    delete_endpoint = next(
+        endpoint
+        for endpoint in inventory.endpoints
+        if endpoint.path == "/users/{user_id}"
+        and endpoint.method == "DELETE"
+    )
+
+    login_endpoint = next(
+        endpoint
+        for endpoint in inventory.endpoints
+        if endpoint.path == "/auth/login"
+        and endpoint.method == "POST"
+    )
+
+    assert delete_endpoint.security_classification.is_destructive is True
+    assert (
+        delete_endpoint.security_classification.has_path_parameters
+        is True
+    )
+    assert (
+        "Destructive operation"
+        in delete_endpoint.security_classification.risk_indicators
+    )
+
+    assert (
+        login_endpoint.security_classification.is_authentication_endpoint
+        is True
+    )
