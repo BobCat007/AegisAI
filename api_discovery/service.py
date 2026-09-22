@@ -11,6 +11,7 @@ from api_discovery.models import (
 def build_object_operation_surfaces(
     endpoints: list[APIEndpoint],
 ) -> list[APIObjectOperationSurface]:
+    
     """
     Group object-specific endpoints by their path template.
 
@@ -48,8 +49,23 @@ def build_object_operation_surfaces(
         if endpoint.method not in surface.operations:
             surface.operations.append(endpoint.method)
 
-    return list(surfaces.values())
+    for surface in surfaces.values():
+        surface.has_read_operation = "GET" in surface.operations
 
+        surface.has_write_operation = any(
+            method in surface.operations
+            for method in {
+                "POST",
+                "PUT",
+                "PATCH",
+            }
+        )
+
+        surface.has_delete_operation = (
+            "DELETE" in surface.operations
+        )
+
+    return list(surfaces.values())
 
 def discover_api(spec: dict[str, Any]) -> APIInventory:
     """

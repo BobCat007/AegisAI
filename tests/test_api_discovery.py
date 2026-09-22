@@ -551,3 +551,7 @@ def test_object_operation_surface():
         "PUT",
         "DELETE",
     }
+
+    assert surface.has_read_operation is True
+    assert surface.has_write_operation is True
+    assert surface.has_delete_operation is True
