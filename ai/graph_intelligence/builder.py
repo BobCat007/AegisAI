@@ -25,6 +25,7 @@ def build_security_graph(
                 object_identifier_names=(
                     surface.object_identifier_names.copy()
                 ),
+                target_method=surface.target_method,
             )
         )
 

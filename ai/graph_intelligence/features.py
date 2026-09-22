@@ -167,6 +167,63 @@ def count_objects_with_write_and_delete_without_read(
 
     return write_and_delete_without_read_objects
 
+def get_target_operation_methods(
+    graph: APISecurityGraph,
+) -> set[str]:
+    """
+    Return the HTTP methods exposed by the object containing
+    the target operation.
+
+    If no target operation is defined, return an empty set.
+    """
+
+    for obj in graph.objects:
+        if obj.target_method is None:
+            continue
+
+        return {
+            operation.method
+            for operation in graph.operations
+            if operation.path_template == obj.path_template
+        }
+
+    return set()
+
+def has_target_delete_without_read(
+    graph: APISecurityGraph,
+) -> bool:
+    """
+    Return True when the target operation is DELETE and
+    the same object does not expose a GET operation.
+    """
+
+    target_method = None
+
+    for obj in graph.objects:
+        if obj.target_method is not None:
+            target_method = obj.target_method
+            break
+
+    if target_method != "DELETE":
+        return False
+
+    methods = get_target_operation_methods(graph)
+
+    return "GET" not in methods
+
+def extract_target_graph_features(
+    graph: APISecurityGraph,
+) -> dict[str, int]:
+    """
+    Extract graph features specific to the target operation.
+    """
+
+    return {
+        "target_delete_without_read": int(
+            has_target_delete_without_read(graph)
+        ),
+    }
+
 def extract_graph_features(
     graph: APISecurityGraph,
 ) -> dict[str, int]:

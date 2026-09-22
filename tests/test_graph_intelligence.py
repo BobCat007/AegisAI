@@ -31,6 +31,7 @@ from ai.graph_intelligence.features import (
     count_objects_with_multiple_mutation_types,
     count_objects_with_write_and_delete_without_read,
     extract_graph_features,
+    has_target_delete_without_read,
 )
 
 from ai.graph_intelligence.schema import (
@@ -667,6 +668,49 @@ def test_build_security_context():
         "objects_with_multiple_mutation_types": 1,
         "objects_with_write_and_delete_without_read": 0,
     }
+
+def test_has_target_delete_without_read():
+    scenarios = [
+        (
+            ["DELETE"],
+            "DELETE",
+            True,
+        ),
+        (
+            ["PUT", "DELETE"],
+            "DELETE",
+            True,
+        ),
+        (
+            ["GET", "PUT", "DELETE"],
+            "DELETE",
+            False,
+        ),
+        (
+            ["POST"],
+            "POST",
+            False,
+        ),
+    ]
+
+    for operations, target_method, expected in scenarios:
+        surface = APIObjectOperationSurface(
+            path_template="/users/{user_id}",
+            object_identifier_names=["user_id"],
+            operations=operations,
+            target_method=target_method,
+            has_read_operation="GET" in operations,
+            has_write_operation=bool(
+                set(operations).intersection(
+                    {"POST", "PUT", "PATCH"}
+                )
+            ),
+            has_delete_operation="DELETE" in operations,
+        )
+
+        graph = build_security_graph([surface])
+
+        assert has_target_delete_without_read(graph) is expected
 
 def test_security_context_feature_schema():
     assert SECURITY_CONTEXT_FEATURE_COUNT == 28

@@ -12,3 +12,13 @@ GRAPH_FEATURE_NAMES: Final[tuple[str, ...]] = (
 
 
 GRAPH_FEATURE_COUNT: Final[int] = len(GRAPH_FEATURE_NAMES)
+
+
+TARGET_GRAPH_FEATURE_NAMES: Final[tuple[str, ...]] = (
+    "target_delete_without_read",
+)
+
+
+TARGET_GRAPH_FEATURE_COUNT: Final[int] = len(
+    TARGET_GRAPH_FEATURE_NAMES
+)

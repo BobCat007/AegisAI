@@ -41,6 +41,7 @@ class APIObjectOperationSurface(BaseModel):
     path_template: str
     object_identifier_names: list[str] = Field(default_factory=list)
     operations: list[str] = Field(default_factory=list)
+    target_method: str | None = None
     has_read_operation: bool = False
     has_write_operation: bool = False
     has_delete_operation: bool = False

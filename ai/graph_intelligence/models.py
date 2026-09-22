@@ -10,6 +10,7 @@ class APIObjectNode(BaseModel):
     object_identifier_names: list[str] = Field(
         default_factory=list
     )
+    target_method: str | None = None
 
 
 class APIOperationEdge(BaseModel):
