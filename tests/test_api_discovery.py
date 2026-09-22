@@ -555,3 +555,31 @@ def test_object_operation_surface():
     assert surface.has_read_operation is True
     assert surface.has_write_operation is True
     assert surface.has_delete_operation is True
+
+def test_read_only_object_operation_surface():
+    spec = {
+        "openapi": "3.0.3",
+        "info": {
+            "title": "Read Only Object API",
+            "version": "1.0.0",
+        },
+        "paths": {
+            "/users/{user_id}": {
+                "get": {
+                    "responses": {
+                        "200": {
+                            "description": "Success",
+                        }
+                    }
+                }
+            }
+        },
+    }
+
+    inventory = discover_api(spec)
+
+    surface = inventory.object_operation_surfaces[0]
+
+    assert surface.has_read_operation is True
+    assert surface.has_write_operation is False
+    assert surface.has_delete_operation is False
