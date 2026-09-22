@@ -12,6 +12,7 @@ from ai.graph_intelligence.models import (
 from ai.graph_intelligence.features import (
     count_objects_with_delete_without_read,
     count_objects_with_full_operation_surface,
+    count_objects_with_multiple_mutation_types,
     count_objects_with_mutation_without_read,
     count_objects_with_write_without_read,
 )
@@ -372,3 +373,73 @@ def test_count_objects_with_write_without_read_empty_graph():
     graph = build_security_graph([])
 
     assert count_objects_with_write_without_read(graph) == 0
+
+def test_count_objects_with_multiple_mutation_types():
+    surface = APIObjectOperationSurface(
+        path_template="/users/{user_id}",
+        object_identifier_names=["user_id"],
+        operations=["GET", "PUT", "DELETE"],
+        has_read_operation=True,
+        has_write_operation=True,
+        has_delete_operation=True,
+    )
+
+    graph = build_security_graph([surface])
+
+    assert count_objects_with_multiple_mutation_types(graph) == 1
+
+
+def test_count_objects_with_multiple_mutation_types_excludes_single_mutation():
+    surfaces = [
+        APIObjectOperationSurface(
+            path_template="/users/{user_id}",
+            object_identifier_names=["user_id"],
+            operations=["GET", "PUT"],
+            has_read_operation=True,
+            has_write_operation=True,
+            has_delete_operation=False,
+        ),
+        APIObjectOperationSurface(
+            path_template="/comments/{comment_id}",
+            object_identifier_names=["comment_id"],
+            operations=["GET", "DELETE"],
+            has_read_operation=True,
+            has_write_operation=False,
+            has_delete_operation=True,
+        ),
+    ]
+
+    graph = build_security_graph(surfaces)
+
+    assert count_objects_with_multiple_mutation_types(graph) == 0
+
+
+def test_count_objects_with_multiple_mutation_types_detects_multiple_writes():
+    surfaces = [
+        APIObjectOperationSurface(
+            path_template="/users/{user_id}",
+            object_identifier_names=["user_id"],
+            operations=["POST", "PUT"],
+            has_read_operation=False,
+            has_write_operation=True,
+            has_delete_operation=False,
+        ),
+        APIObjectOperationSurface(
+            path_template="/profiles/{profile_id}",
+            object_identifier_names=["profile_id"],
+            operations=["PATCH", "DELETE"],
+            has_read_operation=False,
+            has_write_operation=True,
+            has_delete_operation=True,
+        ),
+    ]
+
+    graph = build_security_graph(surfaces)
+
+    assert count_objects_with_multiple_mutation_types(graph) == 2
+
+
+def test_count_objects_with_multiple_mutation_types_empty_graph():
+    graph = build_security_graph([])
+
+    assert count_objects_with_multiple_mutation_types(graph) == 0

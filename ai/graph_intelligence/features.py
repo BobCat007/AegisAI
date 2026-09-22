@@ -110,3 +110,30 @@ def count_objects_with_write_without_read(
             write_without_read_objects += 1
 
     return write_without_read_objects
+
+
+def count_objects_with_multiple_mutation_types(
+    graph: APISecurityGraph,
+) -> int:
+    """
+    Count API objects that expose more than one distinct
+    mutation method.
+    """
+
+    multiple_mutation_objects = 0
+
+    mutation_methods = {"POST", "PUT", "PATCH", "DELETE"}
+
+    for obj in graph.objects:
+        methods = {
+            operation.method
+            for operation in graph.operations
+            if operation.path_template == obj.path_template
+        }
+
+        mutation_types = methods.intersection(mutation_methods)
+
+        if len(mutation_types) > 1:
+            multiple_mutation_objects += 1
+
+    return multiple_mutation_objects
