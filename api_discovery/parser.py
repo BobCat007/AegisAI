@@ -1,3 +1,4 @@
+import re
 from typing import Any
 
 from api_discovery.models import APIEndpoint, SecurityClassification
@@ -44,6 +45,57 @@ def get_operation_category(method: str) -> str:
     }
 
     return categories.get(method, "other")
+
+
+def extract_object_identifier_names(path: str) -> list[str]:
+    """
+    Extract OpenAPI path parameter names from a path template.
+
+    Example:
+        /users/{user_id} -> ["user_id"]
+        /users/{user_id}/orders/{order_id} -> ["user_id", "order_id"]
+    """
+
+    return re.findall(r"\{([^{}]+)\}", path)
+
+
+def classify_object_access_pattern(
+    path: str,
+    object_identifier_names: list[str],
+) -> str:
+    """
+    Classify the structural object-access pattern of an API path.
+
+    Examples:
+        /users -> collection
+        /users/{user_id} -> object
+        /users/{user_id}/orders -> nested_object
+    """
+
+    if not object_identifier_names:
+        return "collection"
+
+    path_segments = [
+        segment
+        for segment in path.strip("/").split("/")
+        if segment
+    ]
+
+    identifier_positions = [
+        index
+        for index, segment in enumerate(path_segments)
+        if segment.startswith("{") and segment.endswith("}")
+    ]
+
+    if len(identifier_positions) == 1:
+        identifier_index = identifier_positions[0]
+
+        if identifier_index == len(path_segments) - 1:
+            return "object"
+
+        return "nested_object"
+
+    return "nested_object"
 
 
 def _find_sensitive_parameter_names(
@@ -179,8 +231,23 @@ def classify_endpoint(
     indicators: list[str] = []
 
     is_authenticated = bool(security)
-    is_destructive = method in {"DELETE", "PUT", "PATCH"}
-    has_path_parameters = "{" in path and "}" in path
+
+    is_destructive = method in {
+        "DELETE",
+        "PUT",
+        "PATCH",
+    }
+
+    object_identifier_names = extract_object_identifier_names(
+        path
+    )
+
+    has_path_parameters = bool(object_identifier_names)
+
+    object_access_pattern = classify_object_access_pattern(
+        path=path,
+        object_identifier_names=object_identifier_names,
+    )
 
     path_lower = path.lower()
 
@@ -219,7 +286,10 @@ def classify_endpoint(
     )
 
     has_sensitive_parameters = bool(sensitive_parameters)
-    has_sensitive_response_fields = bool(sensitive_response_fields)
+
+    has_sensitive_response_fields = bool(
+        sensitive_response_fields
+    )
 
     if is_authenticated:
         indicators.append("Authentication required")
@@ -243,6 +313,8 @@ def classify_endpoint(
         is_authenticated=is_authenticated,
         is_destructive=is_destructive,
         has_path_parameters=has_path_parameters,
+        object_identifier_names=object_identifier_names,
+        object_access_pattern=object_access_pattern,
         is_authentication_endpoint=is_authentication_endpoint,
         has_sensitive_parameters=has_sensitive_parameters,
         sensitive_parameters=sensitive_parameters,

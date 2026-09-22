@@ -7,6 +7,8 @@ class SecurityClassification(BaseModel):
     is_authenticated: bool = False
     is_destructive: bool = False
     has_path_parameters: bool = False
+    object_identifier_names: list[str] = Field(default_factory=list)
+    object_access_pattern: str = "collection"
     is_authentication_endpoint: bool = False
 
     has_sensitive_parameters: bool = False

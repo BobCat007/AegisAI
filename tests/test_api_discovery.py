@@ -91,6 +91,34 @@ def test_security_classification():
         is True
     )
 
+def test_object_identifier_name_detection():
+    spec = load_fixture()
+
+    inventory = discover_api(spec)
+
+    user_endpoint = next(
+        endpoint
+        for endpoint in inventory.endpoints
+        if endpoint.path == "/users/{user_id}"
+        and endpoint.method == "DELETE"
+    )
+
+    collection_endpoint = next(
+        endpoint
+        for endpoint in inventory.endpoints
+        if endpoint.path == "/users"
+        and endpoint.method == "GET"
+    )
+
+    assert (
+        user_endpoint.security_classification.object_identifier_names
+        == ["user_id"]
+    )
+
+    assert (
+        collection_endpoint.security_classification.object_identifier_names
+        == []
+    )
 
 def test_authentication_detection():
     spec = load_fixture()
@@ -399,3 +427,63 @@ def test_operation_categories():
     assert list_users.operation_category == "read"
     assert create_user.operation_category == "create/action"
     assert delete_user.operation_category == "delete"
+
+def test_object_access_pattern_detection():
+    spec = load_fixture()
+
+    inventory = discover_api(spec)
+
+    collection_endpoint = next(
+        endpoint
+        for endpoint in inventory.endpoints
+        if endpoint.path == "/users"
+        and endpoint.method == "GET"
+    )
+
+    object_endpoint = next(
+        endpoint
+        for endpoint in inventory.endpoints
+        if endpoint.path == "/users/{user_id}"
+        and endpoint.method == "DELETE"
+    )
+
+    assert (
+        collection_endpoint.security_classification.object_access_pattern
+        == "collection"
+    )
+
+    assert (
+        object_endpoint.security_classification.object_access_pattern
+        == "object"
+    )
+def test_nested_object_access_pattern_detection():
+    spec = load_fixture()
+
+    spec["paths"]["/users/{user_id}/orders"] = {
+        "get": {
+            "responses": {
+                "200": {
+                    "description": "Success",
+                }
+            }
+        }
+    }
+
+    inventory = discover_api(spec)
+
+    endpoint = next(
+        endpoint
+        for endpoint in inventory.endpoints
+        if endpoint.path == "/users/{user_id}/orders"
+        and endpoint.method == "GET"
+    )
+
+    assert (
+        endpoint.security_classification.object_access_pattern
+        == "nested_object"
+    )
+
+    assert (
+        endpoint.security_classification.object_identifier_names
+        == ["user_id"]
+    )
