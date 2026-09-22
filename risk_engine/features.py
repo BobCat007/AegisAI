@@ -26,6 +26,7 @@ FEATURE_NAMES = [
     "header_parameter_count",
     "request_body_property_count",
     "request_body_required_property_count",
+    "request_body_max_depth",
     "method_get",
     "method_post",
     "method_put",
@@ -179,6 +180,80 @@ def calculate_request_body_required_property_count(
     return 0
 
 
+def calculate_request_body_max_depth(
+    request_body: dict[str, Any] | None,
+) -> int:
+    """
+    Calculate the maximum nesting depth of an object schema.
+
+    A schema with direct properties has depth 1.
+
+    Example:
+
+        {
+            "user": {
+                "name": "..."
+            }
+        }
+
+    has depth 2.
+
+    Returns 0 when the request body does not define an
+    object schema with properties.
+    """
+
+    if not isinstance(request_body, dict):
+        return 0
+
+    content = request_body.get("content")
+
+    if not isinstance(content, dict):
+        return 0
+
+    for media_type in content.values():
+        if not isinstance(media_type, dict):
+            continue
+
+        schema = media_type.get("schema")
+
+        if not isinstance(schema, dict):
+            continue
+
+        return _calculate_schema_depth(schema)
+
+    return 0
+
+
+def _calculate_schema_depth(
+    schema: dict[str, Any],
+) -> int:
+    """
+    Recursively calculate the maximum depth of an object schema.
+    """
+
+    properties = schema.get("properties")
+
+    if not isinstance(properties, dict) or not properties:
+        return 0
+
+    max_child_depth = 0
+
+    for property_schema in properties.values():
+        if not isinstance(property_schema, dict):
+            continue
+
+        child_depth = _calculate_schema_depth(
+            property_schema
+        )
+
+        max_child_depth = max(
+            max_child_depth,
+            child_depth,
+        )
+
+    return 1 + max_child_depth
+
+
 def extract_risk_features(
     endpoint: APIEndpoint,
 ) -> dict[str, float]:
@@ -222,6 +297,11 @@ def extract_risk_features(
         ),
         "request_body_required_property_count": float(
             calculate_request_body_required_property_count(
+                endpoint.request_body
+            )
+        ),
+        "request_body_max_depth": float(
+            calculate_request_body_max_depth(
                 endpoint.request_body
             )
         ),
