@@ -1,14 +1,15 @@
 from typing import Any
 
+from api_discovery.parser import parse_openapi_spec
+
 from api_discovery.models import (
+    APIEndpoint,
     APIInventory,
     APIObjectOperationSurface,
 )
-from api_discovery.parser import parse_openapi_spec
-
 
 def build_object_operation_surfaces(
-    endpoints: list,
+    endpoints: list[APIEndpoint],
 ) -> list[APIObjectOperationSurface]:
     """
     Group object-specific endpoints by their path template.
