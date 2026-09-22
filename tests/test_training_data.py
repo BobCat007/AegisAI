@@ -1,5 +1,9 @@
 from api_discovery.models import APIEndpoint, SecurityClassification
-from scripts.generate_training_data import get_risk_label
+from scripts.generate_training_data import (
+    build_endpoint,
+    generate_empty_response,
+    get_risk_label,
+)
 
 
 def test_low_risk_label():
@@ -62,3 +66,36 @@ def test_critical_risk_label():
     )
 
     assert get_risk_label(endpoint) == "critical"
+
+
+def test_header_parameters_are_generated():
+    endpoint = build_endpoint(
+        path="/users",
+        method="GET",
+        operation_category="read",
+        authenticated=True,
+        header_parameter_count=2,
+    )
+
+    header_parameters = [
+        parameter
+        for parameter in endpoint.parameters
+        if parameter.get("in") == "header"
+    ]
+
+    assert len(header_parameters) == 2
+
+
+def test_empty_response_has_no_response_body():
+    responses = generate_empty_response()
+
+    endpoint = build_endpoint(
+        path="/health/check",
+        method="GET",
+        operation_category="read",
+        authenticated=False,
+        responses=responses,
+    )
+
+    assert endpoint.responses == responses
+    assert endpoint.responses["204"].get("content") is None
