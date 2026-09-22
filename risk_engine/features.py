@@ -1,6 +1,7 @@
 from typing import Any
 
 from api_discovery.models import APIEndpoint
+from risk_engine.schema import FEATURE_NAMES
 
 
 HTTP_METHODS = [
@@ -9,32 +10,6 @@ HTTP_METHODS = [
     "PUT",
     "PATCH",
     "DELETE",
-]
-
-
-FEATURE_NAMES = [
-    "is_authenticated",
-    "is_destructive",
-    "has_path_parameters",
-    "is_authentication_endpoint",
-    "has_sensitive_parameters",
-    "parameter_count",
-    "path_depth",
-    "has_request_body",
-    "path_parameter_count",
-    "query_parameter_count",
-    "header_parameter_count",
-    "request_body_property_count",
-    "request_body_required_property_count",
-    "request_body_max_depth",
-    "has_response_body",
-    "response_body_property_count",
-    "response_body_max_depth",
-    "method_get",
-    "method_post",
-    "method_put",
-    "method_patch",
-    "method_delete",
 ]
 
 
@@ -461,8 +436,8 @@ def extract_feature_vector(
     """
     Convert an API endpoint into an ordered numeric feature vector.
 
-    The order is defined by FEATURE_NAMES and must remain stable
-    when the features are later used by a machine-learning model.
+    The order is defined by the central feature schema and must remain
+    stable when the features are later used by a machine-learning model.
     """
 
     features = extract_risk_features(endpoint)
