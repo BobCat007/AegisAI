@@ -82,3 +82,31 @@ def count_objects_with_delete_without_read(
             delete_without_read_objects += 1
 
     return delete_without_read_objects
+
+
+def count_objects_with_write_without_read(
+    graph: APISecurityGraph,
+) -> int:
+    """
+    Count API objects that expose POST, PUT, or PATCH
+    without exposing a GET operation.
+    """
+
+    write_without_read_objects = 0
+
+    for obj in graph.objects:
+        methods = {
+            operation.method
+            for operation in graph.operations
+            if operation.path_template == obj.path_template
+        }
+
+        has_read = "GET" in methods
+        has_write = bool(
+            methods.intersection({"POST", "PUT", "PATCH"})
+        )
+
+        if has_write and not has_read:
+            write_without_read_objects += 1
+
+    return write_without_read_objects

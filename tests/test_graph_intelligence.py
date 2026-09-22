@@ -13,6 +13,7 @@ from ai.graph_intelligence.features import (
     count_objects_with_delete_without_read,
     count_objects_with_full_operation_surface,
     count_objects_with_mutation_without_read,
+    count_objects_with_write_without_read,
 )
 
 def test_build_security_graph():
@@ -278,3 +279,96 @@ def test_count_objects_with_delete_without_read_empty_graph():
     graph = build_security_graph([])
 
     assert count_objects_with_delete_without_read(graph) == 0
+
+def test_count_objects_with_write_without_read():
+    surface = APIObjectOperationSurface(
+        path_template="/comments/{comment_id}",
+        object_identifier_names=["comment_id"],
+        operations=["POST"],
+        has_read_operation=False,
+        has_write_operation=True,
+        has_delete_operation=False,
+    )
+
+    graph = build_security_graph([surface])
+
+    assert count_objects_with_write_without_read(graph) == 1
+
+
+def test_count_objects_with_write_without_read_excludes_read_surfaces():
+    surfaces = [
+        APIObjectOperationSurface(
+            path_template="/users/{user_id}",
+            object_identifier_names=["user_id"],
+            operations=["GET", "PUT"],
+            has_read_operation=True,
+            has_write_operation=True,
+            has_delete_operation=False,
+        ),
+        APIObjectOperationSurface(
+            path_template="/orders/{order_id}",
+            object_identifier_names=["order_id"],
+            operations=["GET", "POST"],
+            has_read_operation=True,
+            has_write_operation=True,
+            has_delete_operation=False,
+        ),
+    ]
+
+    graph = build_security_graph(surfaces)
+
+    assert count_objects_with_write_without_read(graph) == 0
+
+
+def test_count_objects_with_write_without_read_multiple_write_methods():
+    surfaces = [
+        APIObjectOperationSurface(
+            path_template="/users/{user_id}",
+            object_identifier_names=["user_id"],
+            operations=["POST"],
+            has_read_operation=False,
+            has_write_operation=True,
+            has_delete_operation=False,
+        ),
+        APIObjectOperationSurface(
+            path_template="/profiles/{profile_id}",
+            object_identifier_names=["profile_id"],
+            operations=["PUT"],
+            has_read_operation=False,
+            has_write_operation=True,
+            has_delete_operation=False,
+        ),
+        APIObjectOperationSurface(
+            path_template="/settings/{setting_id}",
+            object_identifier_names=["setting_id"],
+            operations=["PATCH"],
+            has_read_operation=False,
+            has_write_operation=True,
+            has_delete_operation=False,
+        ),
+    ]
+
+    graph = build_security_graph(surfaces)
+
+    assert count_objects_with_write_without_read(graph) == 3
+
+
+def test_count_objects_with_write_without_read_excludes_delete_only_surfaces():
+    surface = APIObjectOperationSurface(
+        path_template="/admin/videos/{video_id}",
+        object_identifier_names=["video_id"],
+        operations=["DELETE"],
+        has_read_operation=False,
+        has_write_operation=False,
+        has_delete_operation=True,
+    )
+
+    graph = build_security_graph([surface])
+
+    assert count_objects_with_write_without_read(graph) == 0
+
+
+def test_count_objects_with_write_without_read_empty_graph():
+    graph = build_security_graph([])
+
+    assert count_objects_with_write_without_read(graph) == 0
