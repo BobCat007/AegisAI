@@ -162,6 +162,8 @@ def parse_openapi_spec(spec: dict[str, Any]) -> list[APIEndpoint]:
                 spec.get("security", []),
             )
 
+            responses = operation.get("responses", {})
+
             normalized_method = method_lower.upper()
 
             security_classification = classify_endpoint(
@@ -183,6 +185,7 @@ def parse_openapi_spec(spec: dict[str, Any]) -> list[APIEndpoint]:
                 tags=operation.get("tags", []),
                 parameters=parameters,
                 request_body=operation.get("requestBody"),
+                responses=responses,
                 security=security,
                 security_classification=security_classification,
             )

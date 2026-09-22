@@ -27,6 +27,7 @@ FEATURE_NAMES = [
     "request_body_property_count",
     "request_body_required_property_count",
     "request_body_max_depth",
+    "has_response_body",
     "method_get",
     "method_post",
     "method_put",
@@ -254,6 +255,32 @@ def _calculate_schema_depth(
     return 1 + max_child_depth
 
 
+def has_response_body(
+    responses: dict[str, Any] | None,
+) -> bool:
+    """
+    Determine whether an endpoint defines at least one response
+    containing a response body.
+
+    A response is considered to have a body when its definition
+    contains a non-empty content object.
+    """
+
+    if not isinstance(responses, dict):
+        return False
+
+    for response in responses.values():
+        if not isinstance(response, dict):
+            continue
+
+        content = response.get("content")
+
+        if isinstance(content, dict) and content:
+            return True
+
+    return False
+
+
 def extract_risk_features(
     endpoint: APIEndpoint,
 ) -> dict[str, float]:
@@ -304,6 +331,9 @@ def extract_risk_features(
             calculate_request_body_max_depth(
                 endpoint.request_body
             )
+        ),
+        "has_response_body": float(
+            has_response_body(endpoint.responses)
         ),
     }
 

@@ -23,6 +23,7 @@ class APIEndpoint(BaseModel):
     tags: list[str] = Field(default_factory=list)
     parameters: list[dict[str, Any]] = Field(default_factory=list)
     request_body: dict[str, Any] | None = None
+    responses: dict[str, Any] = Field(default_factory=dict)
     security: list[dict[str, Any]] = Field(default_factory=list)
     security_classification: SecurityClassification = Field(
         default_factory=SecurityClassification
