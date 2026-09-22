@@ -38,6 +38,55 @@ def test_build_security_graph():
         for operation in graph.operations
     )
 
+    assert all(
+        operation.path_template == "/users/{user_id}"
+        for operation in graph.operations
+    )
+
+
+def test_build_multiple_object_surfaces():
+    surfaces = [
+        APIObjectOperationSurface(
+            path_template="/users/{user_id}",
+            object_identifier_names=["user_id"],
+            operations=["GET", "PUT"],
+            has_read_operation=True,
+            has_write_operation=True,
+            has_delete_operation=False,
+        ),
+        APIObjectOperationSurface(
+            path_template="/orders/{order_id}",
+            object_identifier_names=["order_id"],
+            operations=["GET", "DELETE"],
+            has_read_operation=True,
+            has_write_operation=False,
+            has_delete_operation=True,
+        ),
+    ]
+
+    graph = build_security_graph(surfaces)
+
+    assert len(graph.objects) == 2
+    assert len(graph.operations) == 4
+
+    assert {
+        obj.path_template
+        for obj in graph.objects
+    } == {
+        "/users/{user_id}",
+        "/orders/{order_id}",
+    }
+
+    assert {
+        (operation.path_template, operation.method)
+        for operation in graph.operations
+    } == {
+        ("/users/{user_id}", "GET"),
+        ("/users/{user_id}", "PUT"),
+        ("/orders/{order_id}", "GET"),
+        ("/orders/{order_id}", "DELETE"),
+    }
+
 
 def test_build_empty_security_graph():
     graph = build_security_graph([])
