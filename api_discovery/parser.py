@@ -46,11 +46,81 @@ def get_operation_category(method: str) -> str:
     return categories.get(method, "other")
 
 
+def _find_sensitive_parameter_names(
+    parameters: list[dict[str, Any]],
+) -> list[str]:
+    """
+    Find sensitive parameter names in path, query, and header parameters.
+    """
+
+    sensitive_parameters: list[str] = []
+
+    for parameter in parameters:
+        if not isinstance(parameter, dict):
+            continue
+
+        parameter_name = parameter.get("name")
+
+        if not isinstance(parameter_name, str):
+            continue
+
+        normalized_name = parameter_name.lower().strip()
+
+        if normalized_name in SENSITIVE_PARAMETER_NAMES:
+            sensitive_parameters.append(parameter_name)
+
+    return sensitive_parameters
+
+
+def _find_sensitive_request_body_properties(
+    request_body: dict[str, Any] | None,
+) -> list[str]:
+    """
+    Find sensitive top-level properties in an OpenAPI request body.
+    """
+
+    if not isinstance(request_body, dict):
+        return []
+
+    content = request_body.get("content")
+
+    if not isinstance(content, dict):
+        return []
+
+    sensitive_properties: list[str] = []
+
+    for media_type in content.values():
+        if not isinstance(media_type, dict):
+            continue
+
+        schema = media_type.get("schema")
+
+        if not isinstance(schema, dict):
+            continue
+
+        properties = schema.get("properties")
+
+        if not isinstance(properties, dict):
+            continue
+
+        for property_name in properties:
+            if not isinstance(property_name, str):
+                continue
+
+            normalized_name = property_name.lower().strip()
+
+            if normalized_name in SENSITIVE_PARAMETER_NAMES:
+                sensitive_properties.append(property_name)
+
+    return sensitive_properties
+
+
 def classify_endpoint(
     path: str,
     method: str,
     security: list[dict[str, Any]],
     parameters: list[dict[str, Any]],
+    request_body: dict[str, Any] | None = None,
 ) -> SecurityClassification:
     """
     Classify an API endpoint using security characteristics.
@@ -82,21 +152,15 @@ def classify_endpoint(
         for keyword in authentication_keywords
     )
 
-    sensitive_parameters: list[str] = []
+    sensitive_parameters = _find_sensitive_parameter_names(
+        parameters
+    )
 
-    for parameter in parameters:
-        if not isinstance(parameter, dict):
-            continue
+    sensitive_body_properties = _find_sensitive_request_body_properties(
+        request_body
+    )
 
-        parameter_name = parameter.get("name")
-
-        if not isinstance(parameter_name, str):
-            continue
-
-        normalized_name = parameter_name.lower().strip()
-
-        if normalized_name in SENSITIVE_PARAMETER_NAMES:
-            sensitive_parameters.append(parameter_name)
+    sensitive_parameters.extend(sensitive_body_properties)
 
     has_sensitive_parameters = bool(sensitive_parameters)
 
@@ -163,6 +227,7 @@ def parse_openapi_spec(spec: dict[str, Any]) -> list[APIEndpoint]:
             )
 
             responses = operation.get("responses", {})
+            request_body = operation.get("requestBody")
 
             normalized_method = method_lower.upper()
 
@@ -171,6 +236,7 @@ def parse_openapi_spec(spec: dict[str, Any]) -> list[APIEndpoint]:
                 method=normalized_method,
                 security=security,
                 parameters=parameters,
+                request_body=request_body,
             )
 
             endpoint = APIEndpoint(
@@ -184,7 +250,7 @@ def parse_openapi_spec(spec: dict[str, Any]) -> list[APIEndpoint]:
                 description=operation.get("description"),
                 tags=operation.get("tags", []),
                 parameters=parameters,
-                request_body=operation.get("requestBody"),
+                request_body=request_body,
                 responses=responses,
                 security=security,
                 security_classification=security_classification,

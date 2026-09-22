@@ -165,6 +165,111 @@ def test_sensitive_parameter_detection():
     )
 
 
+def test_sensitive_request_body_property_detection():
+    spec = load_fixture()
+
+    spec["paths"]["/request-body-secret"] = {
+        "post": {
+            "requestBody": {
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "username": {
+                                    "type": "string",
+                                },
+                                "password": {
+                                    "type": "string",
+                                },
+                            },
+                        }
+                    }
+                }
+            },
+            "responses": {
+                "200": {
+                    "description": "Success",
+                }
+            },
+        }
+    }
+
+    inventory = discover_api(spec)
+
+    endpoint = next(
+        endpoint
+        for endpoint in inventory.endpoints
+        if endpoint.path == "/request-body-secret"
+        and endpoint.method == "POST"
+    )
+
+    assert (
+        endpoint.security_classification.has_sensitive_parameters
+        is True
+    )
+
+    assert (
+        endpoint.security_classification.sensitive_parameters
+        == ["password"]
+    )
+
+    assert (
+        "Sensitive parameter detected"
+        in endpoint.security_classification.risk_indicators
+    )
+
+
+def test_non_sensitive_request_body_properties_are_not_flagged():
+    spec = load_fixture()
+
+    spec["paths"]["/request-body-normal"] = {
+        "post": {
+            "requestBody": {
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "username": {
+                                    "type": "string",
+                                },
+                                "email": {
+                                    "type": "string",
+                                },
+                            },
+                        }
+                    }
+                }
+            },
+            "responses": {
+                "200": {
+                    "description": "Success",
+                }
+            },
+        }
+    }
+
+    inventory = discover_api(spec)
+
+    endpoint = next(
+        endpoint
+        for endpoint in inventory.endpoints
+        if endpoint.path == "/request-body-normal"
+        and endpoint.method == "POST"
+    )
+
+    assert (
+        endpoint.security_classification.has_sensitive_parameters
+        is False
+    )
+
+    assert (
+        endpoint.security_classification.sensitive_parameters
+        == []
+    )
+
+
 def test_operation_categories():
     spec = load_fixture()
 
