@@ -1,4 +1,7 @@
-from api_discovery.models import APIObjectOperationSurface
+from api_discovery.models import (
+    APIEndpoint,
+    APIObjectOperationSurface,
+)
 
 from ai.graph_intelligence.builder import build_security_graph
 from ai.graph_intelligence.features import (
@@ -23,6 +26,10 @@ from ai.graph_intelligence.schema import (
     GRAPH_FEATURE_COUNT,
     GRAPH_FEATURE_NAMES,
 )
+
+from ai.security_context import APISecurityContext
+
+from ai.security_context_service import build_security_context
 
 def test_build_security_graph():
     surface = APIObjectOperationSurface(
@@ -592,5 +599,60 @@ def test_extract_graph_features_empty_graph():
         "objects_with_delete_without_read": 0,
         "objects_with_write_without_read": 0,
         "objects_with_multiple_mutation_types": 0,
+        "objects_with_write_and_delete_without_read": 0,
+    }
+
+def test_api_security_context():
+    context = APISecurityContext(
+        endpoint_features=[1.0, 0.0, 1.0],
+        graph_features={
+            "objects_with_full_operation_surface": 2,
+            "objects_with_mutation_without_read": 1,
+        },
+    )
+
+    assert context.endpoint_features == [1.0, 0.0, 1.0]
+    assert context.graph_features == {
+        "objects_with_full_operation_surface": 2,
+        "objects_with_mutation_without_read": 1,
+    }
+
+
+def test_api_security_context_defaults():
+    context = APISecurityContext()
+
+    assert context.endpoint_features == []
+    assert context.graph_features == {}
+
+def test_build_security_context():
+    endpoint = APIEndpoint(
+        path="/users/{user_id}",
+        method="PUT",
+        operation_category="update",
+        parameters=[],
+        responses={},
+    )
+
+    surface = APIObjectOperationSurface(
+        path_template="/users/{user_id}",
+        object_identifier_names=["user_id"],
+        operations=["GET", "PUT", "DELETE"],
+        has_read_operation=True,
+        has_write_operation=True,
+        has_delete_operation=True,
+    )
+
+    graph = build_security_graph([surface])
+
+    context = build_security_context(endpoint, graph)
+
+    assert len(context.endpoint_features) == 22
+
+    assert context.graph_features == {
+        "objects_with_full_operation_surface": 1,
+        "objects_with_mutation_without_read": 0,
+        "objects_with_delete_without_read": 0,
+        "objects_with_write_without_read": 0,
+        "objects_with_multiple_mutation_types": 1,
         "objects_with_write_and_delete_without_read": 0,
     }
