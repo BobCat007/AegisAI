@@ -37,9 +37,18 @@ class APIEndpoint(BaseModel):
     )
 
 
+class APIObjectOperationSurface(BaseModel):
+    path_template: str
+    object_identifier_names: list[str] = Field(default_factory=list)
+    operations: list[str] = Field(default_factory=list)
+
+
 class APIInventory(BaseModel):
     title: str
     version: str
     openapi_version: str
     total_endpoints: int
     endpoints: list[APIEndpoint]
+    object_operation_surfaces: list[APIObjectOperationSurface] = Field(
+        default_factory=list
+    )

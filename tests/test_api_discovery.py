@@ -487,3 +487,67 @@ def test_nested_object_access_pattern_detection():
         endpoint.security_classification.object_identifier_names
         == ["user_id"]
     )
+
+def test_object_operation_surface():
+    spec = {
+        "openapi": "3.0.3",
+        "info": {
+            "title": "Operation Surface Test API",
+            "version": "1.0.0",
+        },
+        "paths": {
+            "/users/{user_id}": {
+                "get": {
+                    "responses": {
+                        "200": {
+                            "description": "Success",
+                        }
+                    }
+                },
+                "put": {
+                    "responses": {
+                        "200": {
+                            "description": "Success",
+                        }
+                    }
+                },
+                "delete": {
+                    "responses": {
+                        "204": {
+                            "description": "Deleted",
+                        }
+                    }
+                },
+            }
+        },
+    }
+
+    inventory = discover_api(spec)
+
+    user_object_operations = {
+        endpoint.method
+        for endpoint in inventory.endpoints
+        if endpoint.path == "/users/{user_id}"
+    }
+
+    assert user_object_operations == {
+        "GET",
+        "PUT",
+        "DELETE",
+    }
+
+    assert len(inventory.object_operation_surfaces) == 1
+
+    surface = inventory.object_operation_surfaces[0]
+
+    assert surface.path_template == "/users/{user_id}"
+
+    assert surface.object_identifier_names == [
+        "user_id"
+    ]
+
+    assert set(surface.operations) == {
+        "GET",
+        "PUT",
+        "DELETE",
+    }
