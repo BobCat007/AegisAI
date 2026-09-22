@@ -28,6 +28,7 @@ FEATURE_NAMES = [
     "request_body_required_property_count",
     "request_body_max_depth",
     "has_response_body",
+    "response_body_property_count",
     "method_get",
     "method_post",
     "method_put",
@@ -281,6 +282,50 @@ def has_response_body(
     return False
 
 
+def calculate_response_body_property_count(
+    responses: dict[str, Any] | None,
+) -> int:
+    """
+    Count top-level properties in the first available response
+    body schema.
+
+    The function checks response definitions for a non-empty
+    content object, then checks the first available media type
+    and counts properties defined directly on its schema.
+
+    Returns 0 when no response body or object properties
+    are defined.
+    """
+
+    if not isinstance(responses, dict):
+        return 0
+
+    for response in responses.values():
+        if not isinstance(response, dict):
+            continue
+
+        content = response.get("content")
+
+        if not isinstance(content, dict):
+            continue
+
+        for media_type in content.values():
+            if not isinstance(media_type, dict):
+                continue
+
+            schema = media_type.get("schema")
+
+            if not isinstance(schema, dict):
+                continue
+
+            properties = schema.get("properties")
+
+            if isinstance(properties, dict):
+                return len(properties)
+
+    return 0
+
+
 def extract_risk_features(
     endpoint: APIEndpoint,
 ) -> dict[str, float]:
@@ -334,6 +379,11 @@ def extract_risk_features(
         ),
         "has_response_body": float(
             has_response_body(endpoint.responses)
+        ),
+        "response_body_property_count": float(
+            calculate_response_body_property_count(
+                endpoint.responses
+            )
         ),
     }
 
