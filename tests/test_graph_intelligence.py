@@ -16,6 +16,12 @@ from ai.graph_intelligence.features import (
     count_objects_with_write_without_read,
     count_objects_with_multiple_mutation_types,
     count_objects_with_write_and_delete_without_read,
+    extract_graph_features,
+)
+
+from ai.graph_intelligence.schema import (
+    GRAPH_FEATURE_COUNT,
+    GRAPH_FEATURE_NAMES,
 )
 
 def test_build_security_graph():
@@ -514,3 +520,77 @@ def test_count_objects_with_write_and_delete_without_read_empty_graph():
     graph = build_security_graph([])
 
     assert count_objects_with_write_and_delete_without_read(graph) == 0
+
+def test_graph_feature_schema_count():
+    assert GRAPH_FEATURE_COUNT == 6
+
+
+def test_graph_feature_names_are_unique():
+    assert len(GRAPH_FEATURE_NAMES) == len(set(GRAPH_FEATURE_NAMES))
+
+
+def test_graph_feature_schema_order():
+    assert GRAPH_FEATURE_NAMES == (
+        "objects_with_full_operation_surface",
+        "objects_with_mutation_without_read",
+        "objects_with_delete_without_read",
+        "objects_with_write_without_read",
+        "objects_with_multiple_mutation_types",
+        "objects_with_write_and_delete_without_read",
+    )
+
+def test_extract_graph_features():
+    surfaces = [
+        APIObjectOperationSurface(
+            path_template="/users/{user_id}",
+            object_identifier_names=["user_id"],
+            operations=["GET", "PUT", "DELETE"],
+            has_read_operation=True,
+            has_write_operation=True,
+            has_delete_operation=True,
+        ),
+        APIObjectOperationSurface(
+            path_template="/admin/{user_id}",
+            object_identifier_names=["user_id"],
+            operations=["DELETE"],
+            has_read_operation=False,
+            has_write_operation=False,
+            has_delete_operation=True,
+        ),
+        APIObjectOperationSurface(
+            path_template="/comments/{comment_id}",
+            object_identifier_names=["comment_id"],
+            operations=["POST"],
+            has_read_operation=False,
+            has_write_operation=True,
+            has_delete_operation=False,
+        ),
+    ]
+
+    graph = build_security_graph(surfaces)
+
+    features = extract_graph_features(graph)
+
+    assert features == {
+        "objects_with_full_operation_surface": 1,
+        "objects_with_mutation_without_read": 2,
+        "objects_with_delete_without_read": 1,
+        "objects_with_write_without_read": 1,
+        "objects_with_multiple_mutation_types": 1,
+        "objects_with_write_and_delete_without_read": 0,
+    }
+
+
+def test_extract_graph_features_empty_graph():
+    graph = build_security_graph([])
+
+    features = extract_graph_features(graph)
+
+    assert features == {
+        "objects_with_full_operation_surface": 0,
+        "objects_with_mutation_without_read": 0,
+        "objects_with_delete_without_read": 0,
+        "objects_with_write_without_read": 0,
+        "objects_with_multiple_mutation_types": 0,
+        "objects_with_write_and_delete_without_read": 0,
+    }

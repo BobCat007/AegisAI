@@ -166,3 +166,31 @@ def count_objects_with_write_and_delete_without_read(
             write_and_delete_without_read_objects += 1
 
     return write_and_delete_without_read_objects
+
+def extract_graph_features(
+    graph: APISecurityGraph,
+) -> dict[str, int]:
+    """
+    Extract the complete graph-level security feature set.
+    """
+
+    return {
+        "objects_with_full_operation_surface": (
+            count_objects_with_full_operation_surface(graph)
+        ),
+        "objects_with_mutation_without_read": (
+            count_objects_with_mutation_without_read(graph)
+        ),
+        "objects_with_delete_without_read": (
+            count_objects_with_delete_without_read(graph)
+        ),
+        "objects_with_write_without_read": (
+            count_objects_with_write_without_read(graph)
+        ),
+        "objects_with_multiple_mutation_types": (
+            count_objects_with_multiple_mutation_types(graph)
+        ),
+        "objects_with_write_and_delete_without_read": (
+            count_objects_with_write_and_delete_without_read(graph)
+        ),
+    }
