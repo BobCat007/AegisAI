@@ -29,6 +29,7 @@ FEATURE_NAMES = [
     "request_body_max_depth",
     "has_response_body",
     "response_body_property_count",
+    "response_body_max_depth",
     "method_get",
     "method_post",
     "method_put",
@@ -326,6 +327,57 @@ def calculate_response_body_property_count(
     return 0
 
 
+def calculate_response_body_max_depth(
+    responses: dict[str, Any] | None,
+) -> int:
+    """
+    Calculate the maximum nesting depth of the first available
+    response body schema.
+
+    A schema with direct properties has depth 1.
+
+    Example:
+
+        {
+            "user": {
+                "profile": {
+                    "name": "..."
+                }
+            }
+        }
+
+    has depth 3.
+
+    Returns 0 when no response body or object properties
+    are defined.
+    """
+
+    if not isinstance(responses, dict):
+        return 0
+
+    for response in responses.values():
+        if not isinstance(response, dict):
+            continue
+
+        content = response.get("content")
+
+        if not isinstance(content, dict):
+            continue
+
+        for media_type in content.values():
+            if not isinstance(media_type, dict):
+                continue
+
+            schema = media_type.get("schema")
+
+            if not isinstance(schema, dict):
+                continue
+
+            return _calculate_schema_depth(schema)
+
+    return 0
+
+
 def extract_risk_features(
     endpoint: APIEndpoint,
 ) -> dict[str, float]:
@@ -382,6 +434,11 @@ def extract_risk_features(
         ),
         "response_body_property_count": float(
             calculate_response_body_property_count(
+                endpoint.responses
+            )
+        ),
+        "response_body_max_depth": float(
+            calculate_response_body_max_depth(
                 endpoint.responses
             )
         ),
