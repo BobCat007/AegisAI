@@ -25,6 +25,7 @@ FEATURE_NAMES = [
     "query_parameter_count",
     "header_parameter_count",
     "request_body_property_count",
+    "request_body_required_property_count",
     "method_get",
     "method_post",
     "method_put",
@@ -137,6 +138,47 @@ def calculate_request_body_property_count(
     return 0
 
 
+def calculate_request_body_required_property_count(
+    request_body: dict[str, Any] | None,
+) -> int:
+    """
+    Count top-level required properties in the request body schema.
+
+    Returns 0 when the request body, schema, or required list
+    is not present.
+    """
+
+    if not isinstance(request_body, dict):
+        return 0
+
+    content = request_body.get("content")
+
+    if not isinstance(content, dict):
+        return 0
+
+    for media_type in content.values():
+        if not isinstance(media_type, dict):
+            continue
+
+        schema = media_type.get("schema")
+
+        if not isinstance(schema, dict):
+            continue
+
+        required = schema.get("required")
+
+        if isinstance(required, list):
+            return len(
+                [
+                    property_name
+                    for property_name in required
+                    if isinstance(property_name, str)
+                ]
+            )
+
+    return 0
+
+
 def extract_risk_features(
     endpoint: APIEndpoint,
 ) -> dict[str, float]:
@@ -175,6 +217,11 @@ def extract_risk_features(
         ),
         "request_body_property_count": float(
             calculate_request_body_property_count(
+                endpoint.request_body
+            )
+        ),
+        "request_body_required_property_count": float(
+            calculate_request_body_required_property_count(
                 endpoint.request_body
             )
         ),
