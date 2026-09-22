@@ -27,3 +27,33 @@ def count_objects_with_full_operation_surface(
             full_surface_objects += 1
 
     return full_surface_objects
+
+
+def count_objects_with_mutation_without_read(
+    graph: APISecurityGraph,
+) -> int:
+    """
+    Count API objects that expose write or delete operations
+    without exposing a GET operation.
+    """
+
+    mutation_without_read_objects = 0
+
+    for obj in graph.objects:
+        methods = {
+            operation.method
+            for operation in graph.operations
+            if operation.path_template == obj.path_template
+        }
+
+        has_read = "GET" in methods
+        has_mutation = bool(
+            methods.intersection(
+                {"POST", "PUT", "PATCH", "DELETE"}
+            )
+        )
+
+        if has_mutation and not has_read:
+            mutation_without_read_objects += 1
+
+    return mutation_without_read_objects
