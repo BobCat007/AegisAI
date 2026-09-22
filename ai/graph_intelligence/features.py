@@ -57,3 +57,28 @@ def count_objects_with_mutation_without_read(
             mutation_without_read_objects += 1
 
     return mutation_without_read_objects
+
+
+def count_objects_with_delete_without_read(
+    graph: APISecurityGraph,
+) -> int:
+    """
+    Count API objects that expose DELETE without exposing GET.
+    """
+
+    delete_without_read_objects = 0
+
+    for obj in graph.objects:
+        methods = {
+            operation.method
+            for operation in graph.operations
+            if operation.path_template == obj.path_template
+        }
+
+        has_read = "GET" in methods
+        has_delete = "DELETE" in methods
+
+        if has_delete and not has_read:
+            delete_without_read_objects += 1
+
+    return delete_without_read_objects
