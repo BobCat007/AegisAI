@@ -137,3 +137,32 @@ def count_objects_with_multiple_mutation_types(
             multiple_mutation_objects += 1
 
     return multiple_mutation_objects
+
+
+def count_objects_with_write_and_delete_without_read(
+    graph: APISecurityGraph,
+) -> int:
+    """
+    Count API objects that expose both write and delete operations
+    without exposing a GET operation.
+    """
+
+    write_and_delete_without_read_objects = 0
+
+    for obj in graph.objects:
+        methods = {
+            operation.method
+            for operation in graph.operations
+            if operation.path_template == obj.path_template
+        }
+
+        has_read = "GET" in methods
+        has_write = bool(
+            methods.intersection({"POST", "PUT", "PATCH"})
+        )
+        has_delete = "DELETE" in methods
+
+        if has_write and has_delete and not has_read:
+            write_and_delete_without_read_objects += 1
+
+    return write_and_delete_without_read_objects
