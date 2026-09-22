@@ -8,8 +8,13 @@ class SecurityClassification(BaseModel):
     is_destructive: bool = False
     has_path_parameters: bool = False
     is_authentication_endpoint: bool = False
+
     has_sensitive_parameters: bool = False
     sensitive_parameters: list[str] = Field(default_factory=list)
+
+    has_sensitive_response_fields: bool = False
+    sensitive_response_fields: list[str] = Field(default_factory=list)
+
     risk_indicators: list[str] = Field(default_factory=list)
 
 

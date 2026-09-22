@@ -269,6 +269,106 @@ def test_non_sensitive_request_body_properties_are_not_flagged():
         == []
     )
 
+def test_sensitive_response_properties_are_not_duplicated():
+    spec = load_fixture()
+
+    spec["paths"]["/duplicate-response-token"] = {
+        "get": {
+            "responses": {
+                "200": {
+                    "description": "Success",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "access_token": {
+                                        "type": "string",
+                                    },
+                                },
+                            }
+                        }
+                    },
+                },
+                "201": {
+                    "description": "Created",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "access_token": {
+                                        "type": "string",
+                                    },
+                                },
+                            }
+                        }
+                    },
+                },
+            }
+        }
+    }
+
+    inventory = discover_api(spec)
+
+    endpoint = next(
+        endpoint
+        for endpoint in inventory.endpoints
+        if endpoint.path == "/duplicate-response-token"
+        and endpoint.method == "GET"
+    )
+
+    assert (
+        endpoint.security_classification.sensitive_response_fields
+        == ["access_token"]
+    )
+
+def test_sensitive_response_property_detection():
+    spec = load_fixture()
+
+    spec["paths"]["/response-token"] = {
+        "get": {
+            "responses": {
+                "200": {
+                    "description": "Success",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "user_id": {
+                                        "type": "string",
+                                    },
+                                    "access_token": {
+                                        "type": "string",
+                                    },
+                                },
+                            }
+                        }
+                    },
+                }
+            },
+        }
+    }
+
+    inventory = discover_api(spec)
+
+    endpoint = next(
+        endpoint
+        for endpoint in inventory.endpoints
+        if endpoint.path == "/response-token"
+        and endpoint.method == "GET"
+    )
+
+    assert (
+        endpoint.security_classification.has_sensitive_response_fields
+        is True
+    )
+
+    assert (
+        endpoint.security_classification.sensitive_response_fields
+        == ["access_token"]
+    )
 
 def test_operation_categories():
     spec = load_fixture()

@@ -110,9 +110,58 @@ def _find_sensitive_request_body_properties(
             normalized_name = property_name.lower().strip()
 
             if normalized_name in SENSITIVE_PARAMETER_NAMES:
-                sensitive_properties.append(property_name)
+                if property_name not in sensitive_properties:
+                    sensitive_properties.append(property_name)
 
     return sensitive_properties
+
+
+def _find_sensitive_response_fields(
+    responses: dict[str, Any] | None,
+) -> list[str]:
+    """
+    Find sensitive top-level properties in OpenAPI response schemas.
+    """
+
+    if not isinstance(responses, dict):
+        return []
+
+    sensitive_fields: list[str] = []
+
+    for response in responses.values():
+        if not isinstance(response, dict):
+            continue
+
+        content = response.get("content")
+
+        if not isinstance(content, dict):
+            continue
+
+        for media_type in content.values():
+            if not isinstance(media_type, dict):
+                continue
+
+            schema = media_type.get("schema")
+
+            if not isinstance(schema, dict):
+                continue
+
+            properties = schema.get("properties")
+
+            if not isinstance(properties, dict):
+                continue
+
+            for property_name in properties:
+                if not isinstance(property_name, str):
+                    continue
+
+                normalized_name = property_name.lower().strip()
+
+                if normalized_name in SENSITIVE_PARAMETER_NAMES:
+                    if property_name not in sensitive_fields:
+                        sensitive_fields.append(property_name)
+
+    return sensitive_fields
 
 
 def classify_endpoint(
@@ -121,6 +170,7 @@ def classify_endpoint(
     security: list[dict[str, Any]],
     parameters: list[dict[str, Any]],
     request_body: dict[str, Any] | None = None,
+    responses: dict[str, Any] | None = None,
 ) -> SecurityClassification:
     """
     Classify an API endpoint using security characteristics.
@@ -160,9 +210,16 @@ def classify_endpoint(
         request_body
     )
 
-    sensitive_parameters.extend(sensitive_body_properties)
+    for property_name in sensitive_body_properties:
+        if property_name not in sensitive_parameters:
+            sensitive_parameters.append(property_name)
+
+    sensitive_response_fields = _find_sensitive_response_fields(
+        responses
+    )
 
     has_sensitive_parameters = bool(sensitive_parameters)
+    has_sensitive_response_fields = bool(sensitive_response_fields)
 
     if is_authenticated:
         indicators.append("Authentication required")
@@ -179,6 +236,9 @@ def classify_endpoint(
     if has_sensitive_parameters:
         indicators.append("Sensitive parameter detected")
 
+    if has_sensitive_response_fields:
+        indicators.append("Sensitive response field detected")
+
     return SecurityClassification(
         is_authenticated=is_authenticated,
         is_destructive=is_destructive,
@@ -186,6 +246,8 @@ def classify_endpoint(
         is_authentication_endpoint=is_authentication_endpoint,
         has_sensitive_parameters=has_sensitive_parameters,
         sensitive_parameters=sensitive_parameters,
+        has_sensitive_response_fields=has_sensitive_response_fields,
+        sensitive_response_fields=sensitive_response_fields,
         risk_indicators=indicators,
     )
 
@@ -237,6 +299,7 @@ def parse_openapi_spec(spec: dict[str, Any]) -> list[APIEndpoint]:
                 security=security,
                 parameters=parameters,
                 request_body=request_body,
+                responses=responses,
             )
 
             endpoint = APIEndpoint(
