@@ -1,0 +1,14 @@
+from typing import Final
+
+from ai.graph_intelligence.schema import GRAPH_FEATURE_NAMES
+from risk_engine.schema import FEATURE_NAMES
+
+
+SECURITY_CONTEXT_FEATURE_NAMES: Final[tuple[str, ...]] = (
+    *FEATURE_NAMES,
+    *GRAPH_FEATURE_NAMES,
+)
+
+SECURITY_CONTEXT_FEATURE_COUNT: Final[int] = len(
+    SECURITY_CONTEXT_FEATURE_NAMES
+)

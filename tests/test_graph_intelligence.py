@@ -1,3 +1,14 @@
+from risk_engine.features import extract_feature_vector
+
+from ai.security_context_features import (
+    build_security_context_feature_vector,
+    extract_security_context_feature_vector,
+)
+from ai.security_context_schema import (
+    SECURITY_CONTEXT_FEATURE_COUNT,
+    SECURITY_CONTEXT_FEATURE_NAMES,
+)
+
 from api_discovery.models import (
     APIEndpoint,
     APIObjectOperationSurface,
@@ -656,3 +667,61 @@ def test_build_security_context():
         "objects_with_multiple_mutation_types": 1,
         "objects_with_write_and_delete_without_read": 0,
     }
+
+def test_security_context_feature_schema():
+    assert SECURITY_CONTEXT_FEATURE_COUNT == 28
+    assert len(SECURITY_CONTEXT_FEATURE_NAMES) == 28
+    assert len(set(SECURITY_CONTEXT_FEATURE_NAMES)) == 28
+
+
+def test_security_context_feature_vector():
+    context = APISecurityContext(
+        endpoint_features=[float(index) for index in range(22)],
+        graph_features={
+            "objects_with_full_operation_surface": 22,
+            "objects_with_mutation_without_read": 23,
+            "objects_with_delete_without_read": 24,
+            "objects_with_write_without_read": 25,
+            "objects_with_multiple_mutation_types": 26,
+            "objects_with_write_and_delete_without_read": 27,
+        },
+    )
+
+    vector = extract_security_context_feature_vector(context)
+
+    assert len(vector) == 28
+    assert vector == [float(index) for index in range(28)]
+
+
+def test_build_security_context_feature_vector():
+    endpoint = APIEndpoint(
+        path="/users/{user_id}",
+        method="PUT",
+        operation_category="update",
+        parameters=[],
+        responses={},
+    )
+
+    surface = APIObjectOperationSurface(
+        path_template="/users/{user_id}",
+        object_identifier_names=["user_id"],
+        operations=["GET", "PUT", "DELETE"],
+        has_read_operation=True,
+        has_write_operation=True,
+        has_delete_operation=True,
+    )
+
+    graph = build_security_graph([surface])
+
+    vector = build_security_context_feature_vector(endpoint, graph)
+
+    assert len(vector) == 28
+    assert vector[:22] == extract_feature_vector(endpoint)
+    assert vector[22:] == [
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+    ]
