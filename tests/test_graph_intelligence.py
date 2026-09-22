@@ -1,6 +1,9 @@
 from api_discovery.models import APIObjectOperationSurface
 
 from ai.graph_intelligence.builder import build_security_graph
+from ai.graph_intelligence.features import (
+    count_objects_with_full_operation_surface,
+)
 from ai.graph_intelligence.models import (
     APIObjectNode,
     APIOperationEdge,
@@ -93,3 +96,57 @@ def test_build_empty_security_graph():
 
     assert graph.objects == []
     assert graph.operations == []
+
+
+def test_count_objects_with_full_operation_surface():
+    surface = APIObjectOperationSurface(
+        path_template="/users/{user_id}",
+        object_identifier_names=["user_id"],
+        operations=["GET", "PUT", "DELETE"],
+        has_read_operation=True,
+        has_write_operation=True,
+        has_delete_operation=True,
+    )
+
+    graph = build_security_graph([surface])
+
+    assert count_objects_with_full_operation_surface(graph) == 1
+
+
+def test_count_objects_with_full_operation_surface_excludes_partial_surfaces():
+    surfaces = [
+        APIObjectOperationSurface(
+            path_template="/users/{user_id}",
+            object_identifier_names=["user_id"],
+            operations=["GET", "PUT", "DELETE"],
+            has_read_operation=True,
+            has_write_operation=True,
+            has_delete_operation=True,
+        ),
+        APIObjectOperationSurface(
+            path_template="/posts/{post_id}",
+            object_identifier_names=["post_id"],
+            operations=["GET"],
+            has_read_operation=True,
+            has_write_operation=False,
+            has_delete_operation=False,
+        ),
+        APIObjectOperationSurface(
+            path_template="/comments/{comment_id}",
+            object_identifier_names=["comment_id"],
+            operations=["GET", "POST"],
+            has_read_operation=True,
+            has_write_operation=True,
+            has_delete_operation=False,
+        ),
+    ]
+
+    graph = build_security_graph(surfaces)
+
+    assert count_objects_with_full_operation_surface(graph) == 1
+
+
+def test_count_objects_with_full_operation_surface_empty_graph():
+    graph = build_security_graph([])
+
+    assert count_objects_with_full_operation_surface(graph) == 0
