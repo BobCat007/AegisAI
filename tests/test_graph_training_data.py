@@ -46,21 +46,24 @@ def test_graph_training_sample_vectors_have_28_features():
     assert sample_count == len(endpoints) * len(scenarios)
 
 
-def test_graph_training_samples_have_features_and_labels():
+def test_graph_training_samples_have_features_labels_and_scores():
     endpoints = generate_endpoint_templates()
 
     samples = build_graph_training_samples(endpoints)
 
     assert len(samples) == len(endpoints) * 6
 
-    for feature_vector, risk_label in samples:
+    for feature_vector, risk_label, graph_context_score in samples:
         assert len(feature_vector) == 28
+
         assert risk_label in {
             "low",
             "medium",
             "high",
             "critical",
         }
+
+        assert 0.0 <= graph_context_score <= 100.0
 
 
 def test_graph_training_samples_preserve_endpoint_labels():
@@ -78,10 +81,37 @@ def test_graph_training_samples_preserve_endpoint_labels():
 
     actual_labels = [
         risk_label
-        for _, risk_label in samples
+        for _, risk_label, _ in samples
     ]
 
     assert actual_labels == expected_labels
+
+
+def test_graph_training_samples_preserve_context_scores():
+    endpoints = generate_endpoint_templates()
+    scenarios = build_graph_scenarios()
+
+    samples = build_graph_training_samples(endpoints)
+
+    expected_scores = []
+
+    for endpoint in endpoints:
+        for scenario in scenarios:
+            graph = build_security_graph(scenario)
+
+            expected_scores.append(
+                get_graph_context_score(
+                    endpoint,
+                    graph,
+                )
+            )
+
+    actual_scores = [
+        graph_context_score
+        for _, _, graph_context_score in samples
+    ]
+
+    assert actual_scores == expected_scores
 
 
 def test_graph_context_score_matches_baseline_without_graph_risk():

@@ -85,7 +85,7 @@ def get_graph_context_severity(
 
 def build_graph_training_samples(
     endpoints: list[APIEndpoint],
-) -> list[tuple[list[float], str]]:
+) -> list[tuple[list[float], str, float]]:
     """
     Combine generated endpoints with controlled graph scenarios.
 
@@ -93,14 +93,15 @@ def build_graph_training_samples(
 
         28-feature security vector
         deterministic endpoint risk label
+        graph-aware contextual risk score
 
-    Graph-aware score and severity are calculated separately
-    and will be incorporated into the dataset contract in a
-    later step.
+    The endpoint label remains the baseline target while the
+    contextual score captures additional relationship-level
+    evidence from the API security graph.
     """
     scenarios = build_graph_scenarios()
 
-    samples: list[tuple[list[float], str]] = []
+    samples: list[tuple[list[float], str, float]] = []
 
     for endpoint in endpoints:
         risk_label = get_risk_label(endpoint)
@@ -113,10 +114,16 @@ def build_graph_training_samples(
                 graph,
             )
 
+            graph_context_score = get_graph_context_score(
+                endpoint,
+                graph,
+            )
+
             samples.append(
                 (
                     feature_vector,
                     risk_label,
+                    graph_context_score,
                 )
             )
 

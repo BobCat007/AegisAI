@@ -3,12 +3,7 @@ from pathlib import Path
 
 from ai.security_context_schema import SECURITY_CONTEXT_FEATURE_NAMES
 from scripts.generate_training_data import generate_endpoint_templates
-from scripts.graph_training_data import (
-    build_graph_training_samples,
-    get_graph_context_score,
-)
-from scripts.generate_graph_scenarios import build_graph_scenarios
-from ai.graph_intelligence.builder import build_security_graph
+from scripts.graph_training_data import build_graph_training_samples
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -31,11 +26,10 @@ def write_graph_training_dataset() -> Path:
         risk_label
         graph_context_score
 
-    The graph context score represents the contextual numeric
-    security score after applying relationship-level evidence.
+    The graph training sample generator owns the complete
+    sample contract, including the contextual risk score.
     """
     endpoints = generate_endpoint_templates()
-    scenarios = build_graph_scenarios()
     samples = build_graph_training_samples(endpoints)
 
     OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -55,28 +49,14 @@ def write_graph_training_dataset() -> Path:
             ]
         )
 
-        sample_index = 0
-
-        for endpoint in endpoints:
-            for scenario in scenarios:
-                feature_vector, risk_label = samples[sample_index]
-
-                graph = build_security_graph(scenario)
-
-                graph_context_score = get_graph_context_score(
-                    endpoint,
-                    graph,
-                )
-
-                writer.writerow(
-                    [
-                        *feature_vector,
-                        risk_label,
-                        graph_context_score,
-                    ]
-                )
-
-                sample_index += 1
+        for feature_vector, risk_label, graph_context_score in samples:
+            writer.writerow(
+                [
+                    *feature_vector,
+                    risk_label,
+                    graph_context_score,
+                ]
+            )
 
     return OUTPUT_PATH
 
