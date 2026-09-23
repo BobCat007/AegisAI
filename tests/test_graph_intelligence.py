@@ -658,7 +658,7 @@ def test_build_security_context():
 
     context = build_security_context(endpoint, graph)
 
-    assert len(context.endpoint_features) == 22
+    assert len(context.endpoint_features) == 25
 
     assert context.graph_features == {
         "objects_with_full_operation_surface": 1,
@@ -713,29 +713,28 @@ def test_has_target_delete_without_read():
         assert has_target_delete_without_read(graph) is expected
 
 def test_security_context_feature_schema():
-    assert SECURITY_CONTEXT_FEATURE_COUNT == 28
-    assert len(SECURITY_CONTEXT_FEATURE_NAMES) == 28
-    assert len(set(SECURITY_CONTEXT_FEATURE_NAMES)) == 28
+    assert SECURITY_CONTEXT_FEATURE_COUNT == 31
+    assert len(SECURITY_CONTEXT_FEATURE_NAMES) == 31
+    assert len(set(SECURITY_CONTEXT_FEATURE_NAMES)) == 31
 
 
 def test_security_context_feature_vector():
     context = APISecurityContext(
-        endpoint_features=[float(index) for index in range(22)],
+        endpoint_features=[float(index) for index in range(25)],
         graph_features={
-            "objects_with_full_operation_surface": 22,
-            "objects_with_mutation_without_read": 23,
-            "objects_with_delete_without_read": 24,
-            "objects_with_write_without_read": 25,
-            "objects_with_multiple_mutation_types": 26,
-            "objects_with_write_and_delete_without_read": 27,
+            "objects_with_full_operation_surface": 25,
+            "objects_with_mutation_without_read": 26,
+            "objects_with_delete_without_read": 27,
+            "objects_with_write_without_read": 28,
+            "objects_with_multiple_mutation_types": 29,
+            "objects_with_write_and_delete_without_read": 30,
         },
     )
 
     vector = extract_security_context_feature_vector(context)
 
-    assert len(vector) == 28
-    assert vector == [float(index) for index in range(28)]
-
+    assert len(vector) == 31
+    assert vector == [float(index) for index in range(31)]
 
 def test_build_security_context_feature_vector():
     endpoint = APIEndpoint(
@@ -759,9 +758,9 @@ def test_build_security_context_feature_vector():
 
     vector = build_security_context_feature_vector(endpoint, graph)
 
-    assert len(vector) == 28
-    assert vector[:22] == extract_feature_vector(endpoint)
-    assert vector[22:] == [
+    assert len(vector) == 31
+    assert vector[:25] == extract_feature_vector(endpoint)
+    assert vector[25:] == [
         1.0,
         0.0,
         0.0,

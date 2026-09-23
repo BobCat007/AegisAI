@@ -17,10 +17,10 @@ def extract_security_context_feature_vector(
 ) -> list[float]:
     """
     Convert endpoint-level and aggregate graph-level
-    intelligence into the existing 28-feature vector.
+    intelligence into the 31-feature security-context vector.
 
     Target-aware graph features remain separate and are not
-    included in this legacy vector.
+    included in this vector.
     """
     graph_features = context.graph_features
 
@@ -41,7 +41,7 @@ def extract_target_security_context_feature_vector(
     """
     Convert endpoint-level, aggregate graph-level, and
     target-aware graph-level intelligence into the
-    29-feature target-aware vector.
+    32-feature target-aware vector.
     """
     endpoint_feature_count = len(context.endpoint_features)
 
@@ -72,11 +72,11 @@ def build_security_context_feature_vector(
     graph: APISecurityGraph,
 ) -> list[float]:
     """
-    Build the existing 28-feature security context vector.
+    Build the 31-feature security-context vector.
 
     Target-aware graph features are calculated and stored in the
     security context but are intentionally not included in this
-    existing vector.
+    vector.
     """
     endpoint_features = extract_feature_vector(endpoint)
     graph_features = extract_graph_features(graph)
@@ -96,7 +96,7 @@ def build_target_security_context_feature_vector(
     graph: APISecurityGraph,
 ) -> list[float]:
     """
-    Build the target-aware 29-feature security context vector.
+    Build the 32-feature target-aware security-context vector.
     """
     endpoint_features = extract_feature_vector(endpoint)
     graph_features = extract_graph_features(graph)

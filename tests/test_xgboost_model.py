@@ -3,6 +3,7 @@ from ai.risk_prediction.xgboost_model import (
 )
 
 from risk_engine.features import extract_feature_vector
+from risk_engine.schema import FEATURE_COUNT
 from scripts.generate_training_data import (
     generate_endpoint_templates,
     get_risk_label,
@@ -93,6 +94,7 @@ def test_xgboost_model_returns_class_probabilities():
             for probability in probability_map.values()
         )
 
+
 def test_xgboost_model_accepts_aegisai_endpoint_features():
     endpoints = generate_endpoint_templates()
 
@@ -113,7 +115,7 @@ def test_xgboost_model_accepts_aegisai_endpoint_features():
 
     assert len(predictions) == len(endpoints)
     assert all(
-        len(feature_vector) == 22
+        len(feature_vector) == FEATURE_COUNT
         for feature_vector in features
     )
     assert set(predictions).issubset(

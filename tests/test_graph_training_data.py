@@ -39,7 +39,7 @@ def test_graph_training_sample_vectors_have_28_features():
                 graph,
             )
 
-            assert len(vector) == 28
+            assert len(vector) == 31
 
             sample_count += 1
 
@@ -54,7 +54,7 @@ def test_graph_training_samples_have_features_labels_and_scores():
     assert len(samples) == len(endpoints) * 6
 
     for feature_vector, risk_label, graph_context_score in samples:
-        assert len(feature_vector) == 28
+        assert len(feature_vector) == 31
 
         assert risk_label in {
             "low",

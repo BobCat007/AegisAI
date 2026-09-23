@@ -6,8 +6,8 @@ from risk_engine.schema import (
 
 
 def test_feature_schema_contains_expected_number_of_features():
-    assert len(FEATURE_DEFINITIONS) == 22
-    assert len(FEATURE_NAMES) == 22
+    assert len(FEATURE_DEFINITIONS) == 25
+    assert len(FEATURE_NAMES) == 25
 
 
 def test_feature_names_are_unique():
@@ -15,7 +15,7 @@ def test_feature_names_are_unique():
 
 
 def test_feature_schema_order():
-    assert FEATURE_NAMES == [
+    assert FEATURE_NAMES == (
         "is_authenticated",
         "is_destructive",
         "has_path_parameters",
@@ -38,7 +38,10 @@ def test_feature_schema_order():
         "method_put",
         "method_patch",
         "method_delete",
-    ]
+        "is_admin_context",
+        "has_user_ownership_context",
+        "has_other_user_context",
+    )
 
 
 def test_feature_types():
@@ -50,3 +53,6 @@ def test_feature_types():
     assert FEATURE_TYPES["response_body_property_count"] == "count"
     assert FEATURE_TYPES["response_body_max_depth"] == "count"
     assert FEATURE_TYPES["method_delete"] == "binary"
+    assert FEATURE_TYPES["is_admin_context"] == "binary"
+    assert FEATURE_TYPES["has_user_ownership_context"] == "binary"
+    assert FEATURE_TYPES["has_other_user_context"] == "binary"

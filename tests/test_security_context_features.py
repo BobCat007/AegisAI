@@ -46,7 +46,7 @@ def build_graph(target_method: str) -> object:
     return build_security_graph([surface])
 
 
-def test_existing_security_context_vector_remains_28_features():
+def test_security_context_vector_has_31_features():
     endpoint = build_endpoint()
     graph = build_graph("DELETE")
 
@@ -56,10 +56,10 @@ def test_existing_security_context_vector_remains_28_features():
     )
 
     assert len(vector) == SECURITY_CONTEXT_FEATURE_COUNT
-    assert len(vector) == 28
+    assert len(vector) == 31
 
 
-def test_target_security_context_vector_has_29_features():
+def test_target_security_context_vector_has_32_features():
     endpoint = build_endpoint()
     graph = build_graph("DELETE")
 
@@ -69,7 +69,7 @@ def test_target_security_context_vector_has_29_features():
     )
 
     assert len(vector) == TARGET_SECURITY_CONTEXT_FEATURE_COUNT
-    assert len(vector) == 29
+    assert len(vector) == 32
 
 
 def test_target_delete_without_read_is_last_feature():

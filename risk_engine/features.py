@@ -353,6 +353,98 @@ def calculate_response_body_max_depth(
     return 0
 
 
+def _operation_text(endpoint: APIEndpoint) -> str:
+    """
+    Build normalized operation metadata text used for semantic
+    authorization-context extraction.
+
+    This intentionally uses only operation metadata exposed by
+    the API specification. It does not use vulnerability labels
+    or external security evidence.
+    """
+
+    classification = endpoint.security_classification
+
+    parts = [
+        endpoint.operation_id or "",
+        endpoint.summary or "",
+        endpoint.description or "",
+        " ".join(endpoint.tags or []),
+        " ".join(classification.risk_indicators or []),
+    ]
+
+    return " ".join(parts).lower()
+
+
+def extract_authorization_context_features(
+    endpoint: APIEndpoint,
+) -> dict[str, float]:
+    """
+    Extract authorization-context signals from API operation metadata.
+
+    These features describe semantic authorization context expressed
+    by the API specification. They do not assert that an endpoint
+    is vulnerable.
+
+    is_admin_context:
+        Indicates explicit administrative context in operation
+        metadata.
+
+    has_user_ownership_context:
+        Indicates that the operation metadata describes a resource
+        as belonging to the current/user context.
+
+    has_other_user_context:
+        Indicates that the operation metadata explicitly refers to
+        resources belonging to other users.
+    """
+
+    text = _operation_text(endpoint)
+
+    admin_indicators = (
+        "admin",
+        "administrator",
+        "administrative",
+    )
+
+    user_ownership_indicators = (
+        "user's",
+        "users'",
+        "this user's",
+        "current user",
+        "current_user",
+        "user vehicle",
+        "user profile",
+        "user's vehicle",
+        "user's profile",
+    )
+
+    other_user_indicators = (
+        "other user",
+        "other users",
+        "another user",
+        "another users",
+    )
+
+    return {
+        "is_admin_context": float(
+            any(indicator in text for indicator in admin_indicators)
+        ),
+        "has_user_ownership_context": float(
+            any(
+                indicator in text
+                for indicator in user_ownership_indicators
+            )
+        ),
+        "has_other_user_context": float(
+            any(
+                indicator in text
+                for indicator in other_user_indicators
+            )
+        ),
+    }
+
+
 def extract_risk_features(
     endpoint: APIEndpoint,
 ) -> dict[str, float]:
@@ -425,6 +517,10 @@ def extract_risk_features(
 
     features.update(
         extract_method_features(endpoint.method)
+    )
+
+    features.update(
+        extract_authorization_context_features(endpoint)
     )
 
     return features

@@ -24,14 +24,14 @@ def test_training_endpoint_with_graph_context():
         graph,
     )
 
-    assert len(vector) == 28
+    assert len(vector) == 31
 
-    assert vector[:22] == [
+    assert vector[:25] == [
         float(value)
-        for value in vector[:22]
+        for value in vector[:25]
     ]
 
-    assert vector[22:] == [
+    assert vector[25:] == [
         1.0,
         0.0,
         0.0,

@@ -29,6 +29,11 @@ def build_endpoint(
     header_parameter_count: int = 0,
     request_body: dict | None = None,
     responses: dict | None = None,
+    operation_id: str | None = None,
+    summary: str | None = None,
+    description: str | None = None,
+    tags: list[str] | None = None,
+    risk_indicators: list[str] | None = None,
 ) -> APIEndpoint:
     parameters = []
 
@@ -88,12 +93,17 @@ def build_endpoint(
             if sensitive_parameters
             else []
         ),
+        risk_indicators=risk_indicators or [],
     )
 
     return APIEndpoint(
         path=path,
         method=method,
         operation_category=operation_category,
+        operation_id=operation_id,
+        summary=summary,
+        description=description,
+        tags=tags or [],
         parameters=parameters,
         request_body=request_body,
         responses=responses or {},
@@ -286,9 +296,7 @@ def generate_endpoint_templates() -> list[APIEndpoint]:
                 resource_index % 4 != 0
             )
 
-            destructive = method in {
-                "DELETE",
-            }
+            destructive = method == "DELETE"
 
             sensitive = (
                 resource_index % 5 == 0
@@ -306,9 +314,7 @@ def generate_endpoint_templates() -> list[APIEndpoint]:
                     % len(request_profiles)
                 ]
 
-            parameter_count = (
-                resource_index % 4
-            )
+            parameter_count = resource_index % 4
 
             header_parameter_count = (
                 (resource_index + method_index) % 3
@@ -404,6 +410,14 @@ def generate_endpoint_templates() -> list[APIEndpoint]:
             responses=generate_empty_response(
                 status_code="204",
             ),
+            operation_id="admin_delete_user",
+            summary="Delete User as Admin",
+            description="Delete another user's account as an administrator.",
+            tags=["Admin"],
+            risk_indicators=[
+                "admin",
+                "other user",
+            ],
         ),
         build_endpoint(
             "/admin/accounts/{account_id}/credentials",
@@ -425,6 +439,13 @@ def generate_endpoint_templates() -> list[APIEndpoint]:
                 property_count=8,
                 depth=3,
             ),
+            operation_id="admin_update_account_credentials",
+            summary="Update Account Credentials as Admin",
+            description="Update account credentials as an administrator.",
+            tags=["Admin"],
+            risk_indicators=[
+                "admin",
+            ],
         ),
         build_endpoint(
             path="/admin/users/{user_id}/credentials",
@@ -436,6 +457,14 @@ def generate_endpoint_templates() -> list[APIEndpoint]:
             authentication_endpoint=True,
             sensitive_parameters=True,
             parameter_count=3,
+            operation_id="admin_delete_user_credentials",
+            summary="Delete User Credentials as Admin",
+            description="Delete another user's credentials as an administrator.",
+            tags=["Admin"],
+            risk_indicators=[
+                "admin",
+                "other user",
+            ],
         ),
         build_endpoint(
             path="/admin/accounts/{account_id}/secrets",
@@ -447,6 +476,13 @@ def generate_endpoint_templates() -> list[APIEndpoint]:
             authentication_endpoint=True,
             sensitive_parameters=True,
             parameter_count=3,
+            operation_id="admin_update_account_secrets",
+            summary="Update Account Secrets as Admin",
+            description="Update account secrets as an administrator.",
+            tags=["Admin"],
+            risk_indicators=[
+                "admin",
+            ],
         ),
         build_endpoint(
             path="/admin/payments/{payment_id}/credentials",
@@ -458,11 +494,72 @@ def generate_endpoint_templates() -> list[APIEndpoint]:
             authentication_endpoint=True,
             sensitive_parameters=True,
             parameter_count=3,
+            operation_id="admin_update_payment_credentials",
+            summary="Update Payment Credentials as Admin",
+            description="Update payment credentials as an administrator.",
+            tags=["Admin"],
+            risk_indicators=[
+                "admin",
+            ],
         ),
         build_endpoint(
-            "/internal/configuration",
-            "GET",
-            "read",
+            path="/users/{user_id}/profile",
+            method="GET",
+            operation_category="read",
+            authenticated=True,
+            path_parameters=True,
+            parameter_count=1,
+            operation_id="get_user_profile",
+            summary="Get User Profile",
+            description="Get the current user's profile.",
+            tags=["User"],
+            risk_indicators=[
+                "user ownership",
+            ],
+        ),
+        build_endpoint(
+            path="/users/{user_id}/vehicle",
+            method="PUT",
+            operation_category="update",
+            authenticated=True,
+            path_parameters=True,
+            parameter_count=2,
+            request_body=generate_request_body(
+                property_count=4,
+                required_count=2,
+                depth=2,
+            ),
+            responses=generate_response(
+                property_count=4,
+                depth=2,
+            ),
+            operation_id="update_user_vehicle",
+            summary="Update User Vehicle",
+            description="Update the current user's vehicle.",
+            tags=["User"],
+            risk_indicators=[
+                "user ownership",
+            ],
+        ),
+        build_endpoint(
+            path="/users/{user_id}/orders/{order_id}",
+            method="GET",
+            operation_category="read",
+            authenticated=True,
+            path_parameters=True,
+            parameter_count=2,
+            operation_id="get_other_user_order",
+            summary="Get Other User Order",
+            description="Get an order belonging to another user.",
+            tags=["User"],
+            risk_indicators=[
+                "other user",
+            ],
+        ),
+        build_endpoint(
+            path="/internal/configuration",
+            method="GET",
+            operation_category="read",
             authenticated=True,
             parameter_count=5,
             header_parameter_count=2,
@@ -472,9 +569,9 @@ def generate_endpoint_templates() -> list[APIEndpoint]:
             ),
         ),
         build_endpoint(
-            "/public/search",
-            "GET",
-            "read",
+            path="/public/search",
+            method="GET",
+            operation_category="read",
             parameter_count=3,
             header_parameter_count=1,
             responses=generate_response(
@@ -521,31 +618,19 @@ def write_dataset(endpoints: list[APIEndpoint]) -> None:
         )
 
         for endpoint in endpoints:
-            feature_vector = extract_feature_vector(
-                endpoint
-            )
-
-            risk_label = get_risk_label(endpoint)
-
             writer.writerow(
                 [
-                    *feature_vector,
-                    risk_label,
+                    *extract_feature_vector(endpoint),
+                    get_risk_label(endpoint),
                 ]
             )
 
 
 def main() -> None:
     endpoints = generate_endpoint_templates()
-
     write_dataset(endpoints)
-
     print(
-        f"Generated {len(endpoints)} API endpoint samples."
-    )
-
-    print(
-        f"Dataset written to: {OUTPUT_PATH}"
+        f"Training dataset written to: {OUTPUT_PATH}"
     )
 
 

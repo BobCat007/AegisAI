@@ -460,6 +460,9 @@ def test_extract_risk_features():
         "method_put": 0.0,
         "method_patch": 0.0,
         "method_delete": 1.0,
+        "is_admin_context": 0.0,
+        "has_user_ownership_context": 0.0,
+        "has_other_user_context": 0.0,
     }
 
 
@@ -498,6 +501,9 @@ def test_extract_features_from_low_risk_endpoint():
         "method_put": 0.0,
         "method_patch": 0.0,
         "method_delete": 0.0,
+        "is_admin_context": 0.0,
+        "has_user_ownership_context": 0.0,
+        "has_other_user_context": 0.0,
     }
 
 
@@ -563,7 +569,7 @@ def test_feature_vector_order():
 
     vector = extract_feature_vector(endpoint)
 
-    assert FEATURE_NAMES == [
+    assert FEATURE_NAMES == (
         "is_authenticated",
         "is_destructive",
         "has_path_parameters",
@@ -586,7 +592,10 @@ def test_feature_vector_order():
         "method_put",
         "method_patch",
         "method_delete",
-    ]
+        "is_admin_context",
+        "has_user_ownership_context",
+        "has_other_user_context",
+    )
 
     assert vector == [
         1.0,
@@ -611,4 +620,7 @@ def test_feature_vector_order():
         0.0,
         0.0,
         1.0,
+        0.0,
+        0.0,
+        0.0,
     ]

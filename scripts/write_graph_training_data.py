@@ -22,7 +22,7 @@ def write_graph_training_dataset() -> Path:
 
     Each row contains:
 
-        28 security-context features
+        31 security-context features
         risk_label
         graph_context_score
 

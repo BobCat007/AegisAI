@@ -61,26 +61,29 @@ def test_risk_assessment_endpoint():
     assert factors["missing_authentication"]["triggered"] is False
 
     assert assessment["feature_vector"] == [
-        1.0,
-        1.0,
-        1.0,
-        0.0,
-        0.0,
-        0.0,
-        2.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        1.0,
+        1.0,  # is_authenticated
+        1.0,  # is_destructive
+        1.0,  # has_path_parameters
+        0.0,  # is_authentication_endpoint
+        0.0,  # has_sensitive_parameters
+        0.0,  # parameter_count
+        2.0,  # path_depth
+        0.0,  # has_request_body
+        0.0,  # path_parameter_count
+        0.0,  # query_parameter_count
+        0.0,  # header_parameter_count
+        0.0,  # request_body_property_count
+        0.0,  # request_body_required_property_count
+        0.0,  # request_body_max_depth
+        0.0,  # has_response_body
+        0.0,  # response_body_property_count
+        0.0,  # response_body_max_depth
+        0.0,  # method_get
+        0.0,  # method_post
+        0.0,  # method_put
+        0.0,  # method_patch
+        1.0,  # method_delete
+        0.0,  # is_admin_context
+        0.0,  # has_user_ownership_context
+        0.0,  # has_other_user_context
     ]
