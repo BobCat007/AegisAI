@@ -126,3 +126,78 @@ def test_integrated_assessment_rejects_invalid_specification():
     assert response.json()["detail"].startswith(
         "Unable to assess OpenAPI specification:"
     )
+
+def test_integrated_assessment_includes_security_evidence():
+    from ai.risk_prediction.evidence import CRAPI_SECURITY_EVIDENCE
+
+    spec = load_fixture()
+
+    evidence = CRAPI_SECURITY_EVIDENCE[0]
+    spec["paths"][evidence.path] = {
+        "delete": {
+            "operationId": "delete_other_users_video",
+            "responses": {
+                "204": {"description": "Deleted"},
+            },
+        },
+    }
+
+    response = client.post(
+        "/api/discovery/assess",
+        json=spec,
+    )
+
+    assert response.status_code == 200
+
+    data = response.json()
+    assessment = next(
+        item
+        for item in data["endpoint_assessments"]
+        if (
+            item["path"] == evidence.path
+            and item["method"] == evidence.method
+        )
+    )
+
+    correlated = assessment["security_evidence"]
+
+    assert correlated["has_security_evidence"] is True
+    assert correlated["vulnerability_types"] == ["BFLA"]
+    assert correlated["predicted_label"] is None
+    assert correlated["evidence_details"][0]["source"] == "OWASP crAPI"
+    assert (
+        data["summary"]["endpoints_matching_documented_evidence"] == 1
+    )
+
+
+def test_unmatched_endpoint_has_no_documented_security_evidence():
+    response = client.post(
+        "/api/discovery/assess",
+        json=load_fixture(),
+    )
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    for assessment in data["endpoint_assessments"]:
+        correlated = assessment["security_evidence"]
+
+        assert correlated["has_security_evidence"] is False
+        assert correlated["vulnerability_types"] == []
+        assert correlated["evidence_details"] == []
+        assert correlated["predicted_label"] is None
+
+
+def test_evidence_correlation_does_not_claim_vulnerability_confirmation():
+    response = client.post(
+        "/api/discovery/assess",
+        json=load_fixture(),
+    )
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert data["vulnerabilities_confirmed"] is False
+    assert data["evidence_catalog"] == "CRAPI_SECURITY_EVIDENCE"

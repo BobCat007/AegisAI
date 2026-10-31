@@ -4,11 +4,12 @@ from fastapi import APIRouter, HTTPException
 
 from ai.graph_intelligence.builder import build_security_graph
 from ai.graph_intelligence.features import extract_graph_features
+from ai.risk_prediction.evidence import CRAPI_SECURITY_EVIDENCE
+from ai.risk_prediction.evidence_evaluator import evaluate_against_evidence
 from ai.security_context_features import (
     build_security_context_feature_vector,
 )
 from ai.security_context_schema import SECURITY_CONTEXT_FEATURE_NAMES
-from api_discovery.models import APIEndpoint
 from api_discovery.service import discover_api
 from risk_engine.scorer import calculate_risk
 
@@ -41,11 +42,11 @@ def discover_openapi(spec: dict[str, Any]):
 @router.post("/assess")
 def assess_openapi(spec: dict[str, Any]):
     """
-    Discover an API and combine its endpoint risk assessments
-    with graph-based security context.
+    Discover an API and combine baseline risk, graph intelligence,
+    security context, and independently documented security evidence.
 
-    This endpoint performs specification analysis only. It does
-    not send requests to the target API or confirm vulnerabilities.
+    This performs static specification analysis only. It does not
+    send requests to the target API or independently verify findings.
     """
 
     try:
@@ -56,11 +57,9 @@ def assess_openapi(spec: dict[str, Any]):
         graph = build_security_graph(
             inventory.object_operation_surfaces
         )
-
         graph_features = extract_graph_features(graph)
 
-        # 3. Assess each endpoint using the existing baseline scorer
-        # and construct its combined security-context feature vector.
+        # 3. Assess every endpoint and correlate documented evidence.
         endpoint_assessments = []
 
         for endpoint in inventory.endpoints:
@@ -72,6 +71,21 @@ def assess_openapi(spec: dict[str, Any]):
                     graph,
                 )
             )
+
+            evidence_evaluation = evaluate_against_evidence(
+                path=endpoint.path,
+                method=endpoint.method,
+                evidence=CRAPI_SECURITY_EVIDENCE,
+            )
+
+            matching_evidence = [
+                item
+                for item in CRAPI_SECURITY_EVIDENCE
+                if (
+                    item.path == endpoint.path
+                    and item.method.upper() == endpoint.method.upper()
+                )
+            ]
 
             endpoint_assessments.append(
                 {
@@ -86,13 +100,26 @@ def assess_openapi(spec: dict[str, Any]):
                         ),
                         "feature_vector": security_context_features,
                     },
+                    "security_evidence": {
+                        **evidence_evaluation.model_dump(),
+                        "evidence_details": [
+                            item.model_dump()
+                            for item in matching_evidence
+                        ],
+                    },
                 }
             )
+
+        evidence_matched_count = sum(
+            assessment["security_evidence"]["has_security_evidence"]
+            for assessment in endpoint_assessments
+        )
 
         return {
             "status": "success",
             "assessment_type": "openapi_static_analysis",
             "vulnerabilities_confirmed": False,
+            "evidence_catalog": "CRAPI_SECURITY_EVIDENCE",
             "inventory": inventory.model_dump(),
             "security_graph": graph.model_dump(),
             "graph_features": graph_features,
@@ -104,6 +131,9 @@ def assess_openapi(spec: dict[str, Any]):
                 "assessed_endpoints": len(endpoint_assessments),
                 "security_context_feature_count": len(
                     SECURITY_CONTEXT_FEATURE_NAMES
+                ),
+                "endpoints_matching_documented_evidence": (
+                    evidence_matched_count
                 ),
             },
             "endpoint_assessments": endpoint_assessments,
