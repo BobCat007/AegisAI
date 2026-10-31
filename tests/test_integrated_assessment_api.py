@@ -165,7 +165,7 @@ def test_integrated_assessment_includes_security_evidence():
 
     assert correlated["has_security_evidence"] is True
     assert correlated["vulnerability_types"] == ["BFLA"]
-    assert correlated["predicted_label"] is None
+    assert correlated["predicted_label"] in {"low", "medium", "high"}
     assert correlated["evidence_details"][0]["source"] == "OWASP crAPI"
 
     assert (
@@ -189,7 +189,7 @@ def test_unmatched_endpoint_has_no_documented_security_evidence():
         assert correlated["has_security_evidence"] is False
         assert correlated["vulnerability_types"] == []
         assert correlated["evidence_details"] == []
-        assert correlated["predicted_label"] is None
+        assert correlated["predicted_label"] in {"low", "medium", "high"}
 
 
 def test_evidence_correlation_does_not_claim_vulnerability_confirmation():

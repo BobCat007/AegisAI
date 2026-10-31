@@ -36,40 +36,29 @@ def discover_openapi(spec: dict[str, Any]):
     """Discover endpoints from an OpenAPI/Swagger specification."""
     try:
         inventory = discover_api(spec)
-
         return {
             "status": "success",
             "inventory": inventory.model_dump(),
         }
-
-    except Exception as exc:
+    except Exception as error:
         raise HTTPException(
             status_code=400,
-            detail=f"Unable to process OpenAPI specification: {exc}",
-        ) from exc
+            detail=f"Unable to discover OpenAPI specification: {error}",
+        ) from error
 
 
 @router.post("/assess")
 def assess_openapi(spec: dict[str, Any]):
-    """
-    Perform static OpenAPI analysis with baseline risk, graph
-    intelligence, optional experimental ML predictions, and
-    independently documented security evidence.
-
-    This endpoint does not send requests to the target API or
-    independently verify vulnerabilities.
-    """
+    """Run static API assessment with optional experimental ML predictions."""
     try:
-        # 1. Discover the API.
+        # 1. Discover endpoints from the supplied OpenAPI specification.
         inventory = discover_api(spec)
 
-        # 2. Build graph intelligence.
-        graph = build_security_graph(
-            inventory.object_operation_surfaces
-        )
-        graph_features = extract_graph_features(graph)
+        # 2. Build the API security graph.
+        graph = build_security_graph(inventory.object_operation_surfaces)
 
-        # 3. Build feature vectors for all discovered endpoints.
+        # 3. Extract graph features and endpoint feature vectors.
+        graph_features = extract_graph_features(graph)
         feature_vectors = [
             build_security_context_feature_vector(endpoint, graph)
             for endpoint in inventory.endpoints
@@ -90,10 +79,17 @@ def assess_openapi(spec: dict[str, Any]):
         for index, endpoint in enumerate(inventory.endpoints):
             baseline_assessment = calculate_risk(endpoint)
 
+            predicted_label = (
+                ml_predictions[index]
+                if ml_predictions is not None
+                else None
+            )
+
             evidence_evaluation = evaluate_against_evidence(
                 path=endpoint.path,
                 method=endpoint.method,
                 evidence=CRAPI_SECURITY_EVIDENCE,
+                predicted_label=predicted_label,
             )
 
             matching_evidence = [
@@ -120,14 +116,13 @@ def assess_openapi(spec: dict[str, Any]):
             else:
                 ml_assessment = {
                     "available": True,
-                    "predicted_label": ml_predictions[index],
+                    "predicted_label": predicted_label,
                     "class_probabilities": ml_probabilities[index],
                     "model_type": "xgboost",
                     "training_data": "synthetic",
                     "limitations": (
-                        "Experimental prediction trained on synthetic data. "
-                        "This prediction is not proof of a vulnerability "
-                        "or a validated real-world risk estimate."
+                        "Predictions are experimental and trained on "
+                        "synthetic data; they are not verified findings."
                     ),
                 }
 
@@ -140,9 +135,7 @@ def assess_openapi(spec: dict[str, Any]):
                     "baseline_risk": baseline_assessment.model_dump(),
                     "ml_risk_prediction": ml_assessment,
                     "security_context": {
-                        "feature_names": list(
-                            SECURITY_CONTEXT_FEATURE_NAMES
-                        ),
+                        "feature_names": list(SECURITY_CONTEXT_FEATURE_NAMES),
                         "feature_vector": feature_vectors[index],
                     },
                     "security_evidence": {
@@ -183,18 +176,17 @@ def assess_openapi(spec: dict[str, Any]):
                 "security_context_feature_count": len(
                     SECURITY_CONTEXT_FEATURE_NAMES
                 ),
-                "endpoints_matching_documented_evidence": (
-                    evidence_matched_count
-                ),
+                "endpoints_matching_documented_evidence": evidence_matched_count,
                 "ml_predictions_available": (
-                    risk_model is not None
+                    ml_predictions is not None
+                    and ml_probabilities is not None
                 ),
             },
             "endpoint_assessments": endpoint_assessments,
         }
 
-    except Exception as exc:
+    except Exception as error:
         raise HTTPException(
             status_code=400,
-            detail=f"Unable to assess OpenAPI specification: {exc}",
-        ) from exc
+            detail=f"Unable to assess OpenAPI specification: {error}",
+        ) from error
