@@ -1,8 +1,10 @@
+import pytest
 import json
 from pathlib import Path
 
 from fastapi.testclient import TestClient
 
+import backend.app.api.discovery as discovery_api
 from backend.app.main import app
 from ai.security_context_schema import SECURITY_CONTEXT_FEATURE_NAMES
 
@@ -63,7 +65,6 @@ def test_integrated_assessment_covers_every_endpoint():
     assert response.status_code == 200
 
     data = response.json()
-
     assessments = data["endpoint_assessments"]
 
     assert len(assessments) == data["inventory"]["total_endpoints"]
@@ -127,12 +128,13 @@ def test_integrated_assessment_rejects_invalid_specification():
         "Unable to assess OpenAPI specification:"
     )
 
+
 def test_integrated_assessment_includes_security_evidence():
     from ai.risk_prediction.evidence import CRAPI_SECURITY_EVIDENCE
 
     spec = load_fixture()
-
     evidence = CRAPI_SECURITY_EVIDENCE[0]
+
     spec["paths"][evidence.path] = {
         "delete": {
             "operationId": "delete_other_users_video",
@@ -165,6 +167,7 @@ def test_integrated_assessment_includes_security_evidence():
     assert correlated["vulnerability_types"] == ["BFLA"]
     assert correlated["predicted_label"] is None
     assert correlated["evidence_details"][0]["source"] == "OWASP crAPI"
+
     assert (
         data["summary"]["endpoints_matching_documented_evidence"] == 1
     )
@@ -201,3 +204,99 @@ def test_evidence_correlation_does_not_claim_vulnerability_confirmation():
 
     assert data["vulnerabilities_confirmed"] is False
     assert data["evidence_catalog"] == "CRAPI_SECURITY_EVIDENCE"
+
+
+def test_ml_predictions_are_returned_when_model_is_available(
+    monkeypatch,
+):
+    from ai.risk_prediction.xgboost_model import XGBoostRiskPredictionModel
+
+    model = XGBoostRiskPredictionModel()
+    model_path = discovery_api.MODEL_PATH
+
+    if not model_path.is_file():
+        # Avoid depending on a developer's local artifact.
+        from scripts.train_risk_prediction_model import train_and_save_model
+
+        train_and_save_model()
+
+    monkeypatch.setattr(
+        discovery_api,
+        "MODEL_PATH",
+        model_path,
+    )
+
+    response = client.post(
+        "/api/discovery/assess",
+        json=load_fixture(),
+    )
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert data["ml_model"]["available"] is True
+    assert data["ml_model"]["predictions_are_experimental"] is True
+    assert data["summary"]["ml_predictions_available"] is True
+
+    for assessment in data["endpoint_assessments"]:
+        prediction = assessment["ml_risk_prediction"]
+
+        assert prediction["available"] is True
+        assert prediction["model_type"] == "xgboost"
+        assert prediction["training_data"] == "synthetic"
+        assert prediction["predicted_label"] in {
+            "low",
+            "medium",
+            "high",
+            "critical",
+        }
+
+        probabilities = prediction["class_probabilities"]
+
+        assert set(probabilities) == {
+            "low",
+            "medium",
+            "high",
+            "critical",
+        }
+        assert sum(probabilities.values()) == pytest.approx(1.0, abs=1e-5)
+
+        # The baseline assessment remains independently available.
+        assert "baseline_risk" in assessment
+        assert "security_evidence" in assessment
+
+
+def test_static_assessment_continues_when_model_artifact_is_missing(
+    monkeypatch,
+    tmp_path,
+):
+    missing_model_path = tmp_path / "missing_model.json"
+
+    monkeypatch.setattr(
+        discovery_api,
+        "MODEL_PATH",
+        missing_model_path,
+    )
+
+    response = client.post(
+        "/api/discovery/assess",
+        json=load_fixture(),
+    )
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert data["status"] == "success"
+    assert data["ml_model"]["available"] is False
+    assert data["summary"]["ml_predictions_available"] is False
+
+    for assessment in data["endpoint_assessments"]:
+        prediction = assessment["ml_risk_prediction"]
+
+        assert prediction["available"] is False
+        assert prediction["predicted_label"] is None
+        assert prediction["class_probabilities"] is None
+        assert "baseline_risk" in assessment
+        assert "security_evidence" in assessment
