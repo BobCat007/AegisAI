@@ -83,27 +83,27 @@ def get_graph_context_severity(
     return "low"
 
 
-def build_graph_training_samples(
+def build_identified_graph_training_samples(
     endpoints: list[APIEndpoint],
-) -> list[tuple[list[float], str, float]]:
+) -> list[tuple[str, list[float], str, float]]:
     """
-    Combine generated endpoints with controlled graph scenarios.
+    Build graph training samples with explicit endpoint identifiers.
 
-    Each returned sample contains:
-
-        28-feature security vector
-        deterministic endpoint risk label
+    Each sample contains:
+        endpoint_id
+        security-context feature vector
+        risk label
         graph-aware contextual risk score
 
-    The endpoint label remains the baseline target while the
-    contextual score captures additional relationship-level
-    evidence from the API security graph.
+    All graph scenarios generated for the same endpoint share
+    the same endpoint identifier.
     """
     scenarios = build_graph_scenarios()
 
-    samples: list[tuple[list[float], str, float]] = []
+    samples: list[tuple[str, list[float], str, float]] = []
 
-    for endpoint in endpoints:
+    for endpoint_index, endpoint in enumerate(endpoints):
+        endpoint_id = f"endpoint_{endpoint_index}"
         risk_label = get_risk_label(endpoint)
 
         for scenario in scenarios:
@@ -121,6 +121,7 @@ def build_graph_training_samples(
 
             samples.append(
                 (
+                    endpoint_id,
                     feature_vector,
                     risk_label,
                     graph_context_score,
@@ -128,3 +129,28 @@ def build_graph_training_samples(
             )
 
     return samples
+
+
+def build_graph_training_samples(
+    endpoints: list[APIEndpoint],
+) -> list[tuple[list[float], str, float]]:
+    """
+    Build graph training samples using the existing return format.
+
+    Preserves backward compatibility with callers expecting:
+        security-context feature vector
+        deterministic endpoint risk label
+        graph-aware contextual risk score
+
+    Endpoint IDs are generated internally but omitted from
+    the returned samples.
+    """
+    identified_samples = build_identified_graph_training_samples(
+        endpoints
+    )
+
+    return [
+        (feature_vector, risk_label, graph_context_score)
+        for _, feature_vector, risk_label, graph_context_score
+        in identified_samples
+    ]

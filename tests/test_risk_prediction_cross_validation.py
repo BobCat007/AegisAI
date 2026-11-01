@@ -143,3 +143,141 @@ def test_cross_validation_rejects_invalid_model_factory():
         raise AssertionError(
             "Expected TypeError for invalid model factory."
         )
+
+
+def build_grouped_test_dataset():
+    features = []
+    labels = []
+    groups = []
+
+    # Four endpoint groups per class, with three scenarios per endpoint.
+    for class_label, class_name in enumerate(
+        ["low", "medium", "high", "critical"]
+    ):
+        for endpoint_index in range(4):
+            group = f"{class_name}_endpoint_{endpoint_index}"
+
+            for scenario_index in range(3):
+                features.append(
+                    [float(class_label), float(endpoint_index), float(scenario_index)]
+                )
+                labels.append(class_name)
+                groups.append(group)
+
+    return features, labels, groups
+
+
+def test_grouped_cross_validation_keeps_groups_separate():
+    from ai.risk_prediction.cross_validation import (
+        run_grouped_cross_validation,
+    )
+
+    features, labels, groups = build_grouped_test_dataset()
+
+    results = run_grouped_cross_validation(
+        MockRiskPredictionModel,
+        features,
+        labels,
+        groups,
+        n_splits=3,
+    )
+
+    assert results["n_splits"] == 3
+    assert results["sample_count"] == len(features)
+    assert results["group_count"] == len(set(groups))
+    assert len(results["folds"]) == 3
+
+    from collections import Counter
+
+    validation_group_counts = Counter()
+    validated_sample_count = 0
+
+    for fold in results["folds"]:
+        assert fold["group_overlap"] == []
+        assert fold["train_size"] + fold["validation_size"] == len(features)
+        assert (
+            fold["train_group_count"] + fold["validation_group_count"]
+            == len(set(groups))
+        )
+        assert len(fold["validation_groups"]) == fold["validation_group_count"]
+
+        validation_group_counts.update(fold["validation_groups"])
+        validated_sample_count += fold["validation_size"]
+
+    assert validated_sample_count == len(features)
+    assert set(validation_group_counts) == set(groups)
+    assert all(count == 1 for count in validation_group_counts.values())
+
+
+def test_grouped_cross_validation_rejects_mismatched_lengths():
+    from ai.risk_prediction.cross_validation import (
+        run_grouped_cross_validation,
+    )
+
+    features, labels, groups = build_grouped_test_dataset()
+
+    try:
+        run_grouped_cross_validation(
+            MockRiskPredictionModel,
+            features,
+            labels,
+            groups[:-1],
+            n_splits=3,
+        )
+    except ValueError as error:
+        assert "same number of samples" in str(error)
+    else:
+        raise AssertionError("Expected ValueError for mismatched lengths.")
+
+
+def test_grouped_cross_validation_rejects_inconsistent_group_labels():
+    from ai.risk_prediction.cross_validation import (
+        run_grouped_cross_validation,
+    )
+
+    features, labels, groups = build_grouped_test_dataset()
+    labels[1] = "medium"
+
+    try:
+        run_grouped_cross_validation(
+            MockRiskPredictionModel,
+            features,
+            labels,
+            groups,
+            n_splits=3,
+        )
+    except ValueError as error:
+        assert "single consistent label" in str(error)
+    else:
+        raise AssertionError("Expected ValueError for inconsistent group labels.")
+
+
+def test_grouped_cross_validation_rejects_insufficient_groups_per_class():
+    from ai.risk_prediction.cross_validation import (
+        run_grouped_cross_validation,
+    )
+
+    features = [[float(index)] for index in range(9)]
+    labels = (
+        ["low"] * 3
+        + ["critical"] * 3
+        + ["critical"] * 3
+    )
+    groups = (
+        ["low_1"] * 3
+        + ["critical_1"] * 3
+        + ["critical_2"] * 3
+    )
+
+    try:
+        run_grouped_cross_validation(
+            MockRiskPredictionModel,
+            features,
+            labels,
+            groups,
+            n_splits=3,
+        )
+    except ValueError as error:
+        assert "distinct groups per class" in str(error)
+    else:
+        raise AssertionError("Expected ValueError for too few class groups.")

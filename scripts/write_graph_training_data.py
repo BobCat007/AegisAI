@@ -3,7 +3,7 @@ from pathlib import Path
 
 from ai.security_context_schema import SECURITY_CONTEXT_FEATURE_NAMES
 from scripts.generate_training_data import generate_endpoint_templates
-from scripts.graph_training_data import build_graph_training_samples
+from scripts.graph_training_data import build_identified_graph_training_samples
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -21,16 +21,13 @@ def write_graph_training_dataset() -> Path:
     Generate and write the graph-aware API security training dataset.
 
     Each row contains:
-
+        endpoint_id
         31 security-context features
         risk_label
         graph_context_score
-
-    The graph training sample generator owns the complete
-    sample contract, including the contextual risk score.
     """
     endpoints = generate_endpoint_templates()
-    samples = build_graph_training_samples(endpoints)
+    samples = build_identified_graph_training_samples(endpoints)
 
     OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
 
@@ -43,15 +40,17 @@ def write_graph_training_dataset() -> Path:
 
         writer.writerow(
             [
+                "endpoint_id",
                 *SECURITY_CONTEXT_FEATURE_NAMES,
                 "risk_label",
                 "graph_context_score",
             ]
         )
 
-        for feature_vector, risk_label, graph_context_score in samples:
+        for endpoint_id, feature_vector, risk_label, graph_context_score in samples:
             writer.writerow(
                 [
+                    endpoint_id,
                     *feature_vector,
                     risk_label,
                     graph_context_score,
@@ -63,7 +62,6 @@ def write_graph_training_dataset() -> Path:
 
 def main() -> None:
     output_path = write_graph_training_dataset()
-
     print(f"Graph training dataset written to: {output_path}")
 
 
