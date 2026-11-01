@@ -7,3 +7,4 @@ pytest
 httpx2
 xgboost
 scikit-learn
+shap==0.51.0
