@@ -61,15 +61,12 @@ def test_shap_explanations_are_returned_when_requested():
 
     data = response.json()
 
-    assert data["shap_explainability"]["available"] is True
-    assert (
-        data["shap_explainability"]["method"]
-        == "SHAP TreeExplainer"
-    )
+    shap_data = data["shap_explainability"]
 
-    global_importance = (
-        data["shap_explainability"]["global_feature_importance"]
-    )
+    assert shap_data["available"] is True
+    assert shap_data["method"] == "SHAP TreeExplainer"
+
+    global_importance = shap_data["global_feature_importance"]
 
     assert len(global_importance) <= 10
     assert global_importance
@@ -117,6 +114,42 @@ def test_shap_explanations_are_returned_when_requested():
                     "decreases_class_score",
                     "no_effect",
                 }
+
+    # Assessment-level graph explanations.
+    graph_explanations = shap_data["graph_explanations"]
+
+    assert graph_explanations["scope"] == "assessment_graph"
+    assert len(graph_explanations["class_explanations"]) == (
+        len(data["endpoint_assessments"]) * 4
+    )
+
+    for class_explanation in graph_explanations["class_explanations"]:
+        assert class_explanation["risk_class"] in {
+            "low",
+            "medium",
+            "high",
+            "critical",
+        }
+
+        assert class_explanation["endpoint_index"] >= 0
+
+        for feature_evidence in class_explanation["graph_feature_evidence"]:
+            assert feature_evidence["scope"] == "assessment_graph"
+            assert feature_evidence["feature_name"]
+            assert feature_evidence["direction"] in {
+                "increases_class_score",
+                "decreases_class_score",
+                "no_effect",
+            }
+
+            assert feature_evidence["matched_object_count"] >= 0
+            assert isinstance(feature_evidence["count_matches"], bool)
+
+            for evidence in feature_evidence["evidence"]:
+                assert evidence["path_template"]
+                assert isinstance(evidence["object_identifier_names"], list)
+                assert isinstance(evidence["operations"], list)
+                assert evidence["reason"]
 
 
 def test_shap_can_be_requested_without_a_model_artifact(

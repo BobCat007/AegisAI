@@ -4,6 +4,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException
 
 from ai.graph_intelligence.builder import build_security_graph
+from ai.graph_intelligence.explanation_mapper import GraphExplanationMapper
 from ai.graph_intelligence.features import extract_graph_features
 from ai.risk_prediction.evidence import CRAPI_SECURITY_EVIDENCE
 from ai.risk_prediction.evidence_evaluator import evaluate_against_evidence
@@ -123,6 +124,53 @@ def _serialize_endpoint_explanation(
     }
 
 
+def _serialize_graph_explanations(
+    explanations: list[Any],
+    object_surfaces: list[Any],
+) -> dict[str, Any]:
+    """
+    Map assessment-level graph feature contributions to object surfaces.
+
+    Each endpoint explanation has class-specific SHAP contributions.
+    The mapped evidence remains assessment-wide and is not attributed
+    to the individual endpoint.
+    """
+
+    mapper = GraphExplanationMapper()
+    class_explanations = []
+
+    for endpoint_index, endpoint_explanation in enumerate(explanations):
+        for class_explanation in endpoint_explanation.class_explanations:
+            graph_evidence = mapper.map_contributions(
+                class_explanation.contributions,
+                object_surfaces,
+            )
+
+            class_explanations.append(
+                {
+                    "endpoint_index": endpoint_index,
+                    "risk_class": class_explanation.risk_class,
+                    "graph_feature_evidence": graph_evidence,
+                }
+            )
+
+    return {
+        "scope": "assessment_graph",
+        "description": (
+            "Graph features describe object-operation relationships "
+            "across the entire API assessment. Their evidence is not "
+            "specific to an individual endpoint."
+        ),
+        "class_explanations": class_explanations,
+        "limitations": (
+            "Operation-surface patterns are structural security signals, "
+            "not proof of authorization failures or vulnerabilities. "
+            "SHAP contributions describe model behavior, not verified "
+            "security findings."
+        ),
+    }
+
+
 @router.post("/openapi")
 def discover_openapi(spec: dict[str, Any]):
     """Discover endpoints from an OpenAPI/Swagger specification."""
@@ -178,6 +226,7 @@ def assess_openapi(
         ml_probabilities = None
         shap_explanations = None
         shap_global_importance = None
+        graph_explanations = None
 
         if risk_model is not None and feature_vectors:
             ml_predictions = risk_model.predict(feature_vectors)
@@ -195,6 +244,11 @@ def assess_openapi(
                     explainer.global_feature_importance(
                         feature_vectors
                     )[:SHAP_GLOBAL_FEATURES]
+                )
+
+                graph_explanations = _serialize_graph_explanations(
+                    shap_explanations,
+                    inventory.object_operation_surfaces,
                 )
 
         # 6. Assess every endpoint independently.
@@ -348,6 +402,7 @@ def assess_openapi(
                         }
                         for item in shap_global_importance
                     ],
+                    "graph_explanations": graph_explanations,
                     "limitations": (
                         "Global importance is calculated over the "
                         "endpoints in this assessment only. SHAP "
