@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 
+from backend.app.api.behavioral import router as behavioral_router
 from backend.app.api.discovery import router as discovery_router
 from backend.app.api.risk import router as risk_router
 
@@ -13,6 +14,7 @@ app = FastAPI(
 
 app.include_router(discovery_router)
 app.include_router(risk_router)
+app.include_router(behavioral_router)
 
 
 @app.get("/")
