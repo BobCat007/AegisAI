@@ -15,6 +15,7 @@ from ai.security_context_schema import SECURITY_CONTEXT_FEATURE_NAMES
 from ai.security_reasoning import (
     EvidenceConfidenceEngine,
     EvidenceCorrelationEngine,
+    RemediationEngine,
     SecurityReasoningEngine,
 )
 from api_discovery.service import discover_api
@@ -199,20 +200,12 @@ def assess_openapi(
     include_explanations: bool = False,
 ):
     """
-    Run static API assessment with optional ML, SHAP, and security reasoning.
-
-    Evidence strength is a heuristic assessment of evidence sources.
-    It is not the probability that an endpoint is vulnerable.
-
-    Risk prioritization preserves the baseline risk score and applies
-    only a bounded upward adjustment based on evidence strength.
-
-    No static assessment or model prediction independently confirms
-    a vulnerability.
+    Run static API assessment with optional ML, SHAP, reasoning,
+    evidence confidence, and remediation recommendations.
     """
 
     try:
-        # 1. Discover endpoints from the supplied OpenAPI specification.
+        # 1. Discover endpoints.
         inventory = discover_api(spec)
 
         # 2. Build the API security graph.
@@ -260,10 +253,11 @@ def assess_openapi(
                     inventory.object_operation_surfaces,
                 )
 
-        # 6. Initialize reasoning, correlation, and confidence engines.
+        # 6. Initialize assessment engines.
         reasoning_engine = SecurityReasoningEngine()
         correlation_engine = EvidenceCorrelationEngine()
         confidence_engine = EvidenceConfidenceEngine()
+        remediation_engine = RemediationEngine()
 
         # 7. Assess every endpoint independently.
         endpoint_assessments = []
@@ -305,7 +299,7 @@ def assess_openapi(
                 ),
             )
 
-            # 9. Normalize endpoint evidence and correlate its signals.
+            # 9. Correlate endpoint evidence.
             normalized_evidence = correlation_engine.normalize_endpoint(
                 reasoning=security_reasoning,
                 predicted_label=predicted_label,
@@ -326,6 +320,14 @@ def assess_openapi(
                 baseline_severity=baseline_assessment.severity,
             )
 
+            # 11. Generate remediation recommendations.
+            remediation_plan = remediation_engine.generate(
+                reasoning=security_reasoning,
+                risk_prioritization=(
+                    evidence_assessment.risk_prioritization
+                ),
+            )
+
             security_reasoning_response = security_reasoning.model_dump()
 
             security_reasoning_response["evidence_correlation"] = (
@@ -336,7 +338,11 @@ def assess_openapi(
                 evidence_assessment.model_dump()
             )
 
-            # 11. Serialize the optional ML prediction.
+            security_reasoning_response["remediation_plan"] = (
+                remediation_plan.model_dump()
+            )
+
+            # 12. Serialize the optional ML prediction.
             if ml_predictions is None or ml_probabilities is None:
                 ml_assessment = {
                     "available": False,
@@ -386,8 +392,6 @@ def assess_openapi(
                 "security_reasoning": security_reasoning_response,
             }
 
-            # Preserve the existing response by adding this field
-            # only when explanations were explicitly requested.
             if include_explanations:
                 if shap_explanations is not None:
                     endpoint_assessment["shap_explanation"] = (
@@ -406,7 +410,7 @@ def assess_openapi(
 
             endpoint_assessments.append(endpoint_assessment)
 
-        # 12. Calculate assessment summary counters.
+        # 13. Calculate assessment summary counters.
         evidence_matched_count = sum(
             assessment["security_evidence"]["has_security_evidence"]
             for assessment in endpoint_assessments
@@ -460,7 +464,22 @@ def assess_openapi(
             else 0.0
         )
 
-        # 13. Build the assessment response.
+        remediation_recommendation_count = sum(
+            assessment["security_reasoning"][
+                "remediation_plan"
+            ]["total_recommendations"]
+            for assessment in endpoint_assessments
+        )
+
+        high_priority_remediation_count = sum(
+            recommendation["priority"] in ("high", "critical")
+            for assessment in endpoint_assessments
+            for recommendation in assessment["security_reasoning"][
+                "remediation_plan"
+            ]["recommendations"]
+        )
+
+        # 14. Build the assessment response.
         response = {
             "status": "success",
             "assessment_type": "openapi_static_analysis",
@@ -503,6 +522,12 @@ def assess_openapi(
                 "average_evidence_strength": (
                     average_evidence_strength
                 ),
+                "remediation_recommendations": (
+                    remediation_recommendation_count
+                ),
+                "high_or_critical_remediation_recommendations": (
+                    high_priority_remediation_count
+                ),
                 "ml_predictions_available": (
                     ml_predictions is not None
                     and ml_probabilities is not None
@@ -511,7 +536,7 @@ def assess_openapi(
             "endpoint_assessments": endpoint_assessments,
         }
 
-        # 14. Add assessment-level SHAP information only when requested.
+        # 15. Add assessment-level SHAP information only when requested.
         if include_explanations:
             if shap_explanations is not None:
                 response["shap_explainability"] = {

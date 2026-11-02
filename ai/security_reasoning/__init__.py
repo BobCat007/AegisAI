@@ -15,6 +15,11 @@ from ai.security_reasoning.models import (
     SecurityReasoningFinding,
     SecurityReasoningResult,
 )
+from ai.security_reasoning.remediation import (
+    RemediationEngine,
+    RemediationPlan,
+    SecurityRemediation,
+)
 
 __all__ = [
     "CorrelatedEvidenceGroup",
@@ -28,8 +33,11 @@ __all__ = [
     "EvidenceStrengthAssessment",
     "EvidenceValidationAssessment",
     "ReasoningEvidence",
+    "RemediationEngine",
+    "RemediationPlan",
     "RiskPrioritizationAssessment",
     "SecurityReasoningEngine",
     "SecurityReasoningFinding",
     "SecurityReasoningResult",
+    "SecurityRemediation",
 ]
