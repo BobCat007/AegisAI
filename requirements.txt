@@ -8,3 +8,4 @@ httpx2
 xgboost
 scikit-learn
 shap==0.51.0
+trustme>=1.2,<2
