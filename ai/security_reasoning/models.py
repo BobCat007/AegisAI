@@ -30,6 +30,7 @@ ReasoningConfidence = Literal["low", "medium", "high"]
 ValidationStatus = Literal[
     "not_validated",
     "documented_reference",
+    "runtime_validated",
 ]
 
 EvidenceSourceType = Literal[
@@ -58,23 +59,12 @@ EvidenceRelationshipType = Literal[
 
 
 class ReasoningEvidence(BaseModel):
-    """
-    A traceable item supporting a security reasoning finding.
-
-    Evidence describes its source and observation. It does not
-    automatically establish that a vulnerability exists.
-    """
-
     source: str
     detail: str
     reference: str | None = None
 
 
 class SecurityReasoningFinding(BaseModel):
-    """
-    One human-readable security concern produced by the reasoning engine.
-    """
-
     finding_id: str
     category: ReasoningCategory
     title: str
@@ -87,10 +77,6 @@ class SecurityReasoningFinding(BaseModel):
 
 
 class SecurityReasoningResult(BaseModel):
-    """
-    Combined human-readable reasoning for one API endpoint.
-    """
-
     path: str
     method: str
     overall_assessment: Literal[
@@ -105,14 +91,6 @@ class SecurityReasoningResult(BaseModel):
 
 
 class EvidenceSource(BaseModel):
-    """
-    Normalized evidence signal used by the correlation engine.
-
-    dependency_group identifies signals derived from the same
-    underlying system. For example, ML prediction and SHAP output
-    should both use the same model dependency group.
-    """
-
     source_id: str
     source_type: EvidenceSourceType
     scope: EvidenceScope
@@ -124,10 +102,6 @@ class EvidenceSource(BaseModel):
 
 
 class EvidenceRelationship(BaseModel):
-    """
-    Describes the relationship between two normalized evidence signals.
-    """
-
     source_id_a: str
     source_id_b: str
     relationship: EvidenceRelationshipType
@@ -136,13 +110,6 @@ class EvidenceRelationship(BaseModel):
 
 
 class CorrelatedEvidenceGroup(BaseModel):
-    """
-    Evidence grouped by the same scope and reference.
-
-    independent_source_count is descriptive only. It must not be
-    interpreted as a vulnerability confidence score.
-    """
-
     group_id: str
     scope: EvidenceScope
     reference: str | None = None
@@ -152,10 +119,6 @@ class CorrelatedEvidenceGroup(BaseModel):
 
 
 class EvidenceCorrelationResult(BaseModel):
-    """
-    Complete output of the standalone evidence correlation engine.
-    """
-
     groups: list[CorrelatedEvidenceGroup] = Field(default_factory=list)
     relationships: list[EvidenceRelationship] = Field(default_factory=list)
     total_evidence_sources: int = 0
@@ -168,3 +131,50 @@ class EvidenceCorrelationResult(BaseModel):
             "The number of independent sources is descriptive and is not a confidence score.",
         ]
     )
+
+
+class EvidenceSourceAssessment(BaseModel):
+    dependency_group: str
+    source_types: list[str] = Field(default_factory=list)
+    reliability_weight: float = Field(ge=0, le=1)
+    evidence_count: int = Field(ge=1)
+    independent: bool = True
+
+
+class EvidenceStrengthAssessment(BaseModel):
+    score: int = Field(ge=0, le=100)
+    level: Literal["low", "medium", "high"]
+    independent_source_count: int = Field(ge=0)
+    source_assessments: list[EvidenceSourceAssessment] = Field(
+        default_factory=list
+    )
+    conflict_count: int = Field(ge=0)
+    conflict_penalty: int = Field(ge=0)
+    rationale: list[str] = Field(default_factory=list)
+    limitations: list[str] = Field(default_factory=list)
+
+
+class EvidenceValidationAssessment(BaseModel):
+    status: ValidationStatus
+    runtime_validated: bool = False
+    documented_reference_present: bool = False
+    explanation: str
+
+
+class RiskPrioritizationAssessment(BaseModel):
+    baseline_score: float = Field(ge=0, le=100)
+    baseline_severity: str
+    evidence_strength_score: int = Field(ge=0, le=100)
+    priority_score: int = Field(ge=0, le=100)
+    priority_level: Literal["low", "medium", "high", "critical"]
+    adjustment: float
+    rationale: str
+    scoring_method: str
+    vulnerabilities_confirmed: bool = False
+
+
+class EvidenceAssessmentResult(BaseModel):
+    evidence_strength: EvidenceStrengthAssessment
+    validation_status: EvidenceValidationAssessment
+    risk_prioritization: RiskPrioritizationAssessment
+    vulnerabilities_confirmed: bool = False

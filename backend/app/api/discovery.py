@@ -8,13 +8,12 @@ from ai.graph_intelligence.explanation_mapper import GraphExplanationMapper
 from ai.graph_intelligence.features import extract_graph_features
 from ai.risk_prediction.evidence import CRAPI_SECURITY_EVIDENCE
 from ai.risk_prediction.evidence_evaluator import evaluate_against_evidence
-from ai.risk_prediction.explainability import (
-    RiskPredictionExplainer,
-)
+from ai.risk_prediction.explainability import RiskPredictionExplainer
 from ai.risk_prediction.xgboost_model import XGBoostRiskPredictionModel
 from ai.security_context_features import build_security_context_feature_vector
 from ai.security_context_schema import SECURITY_CONTEXT_FEATURE_NAMES
 from ai.security_reasoning import (
+    EvidenceConfidenceEngine,
     EvidenceCorrelationEngine,
     SecurityReasoningEngine,
 )
@@ -202,11 +201,14 @@ def assess_openapi(
     """
     Run static API assessment with optional ML, SHAP, and security reasoning.
 
-    SHAP explanations are generated only when include_explanations
-    is explicitly enabled and a trained model artifact is available.
+    Evidence strength is a heuristic assessment of evidence sources.
+    It is not the probability that an endpoint is vulnerable.
 
-    Security reasoning uses endpoint classification and documented
-    security evidence. It does not independently confirm vulnerabilities.
+    Risk prioritization preserves the baseline risk score and applies
+    only a bounded upward adjustment based on evidence strength.
+
+    No static assessment or model prediction independently confirms
+    a vulnerability.
     """
 
     try:
@@ -258,9 +260,10 @@ def assess_openapi(
                     inventory.object_operation_surfaces,
                 )
 
-        # 6. Initialize reasoning and evidence correlation engines.
+        # 6. Initialize reasoning, correlation, and confidence engines.
         reasoning_engine = SecurityReasoningEngine()
         correlation_engine = EvidenceCorrelationEngine()
+        confidence_engine = EvidenceConfidenceEngine()
 
         # 7. Assess every endpoint independently.
         endpoint_assessments = []
@@ -316,11 +319,24 @@ def assess_openapi(
                 normalized_evidence
             )
 
+            # 10. Assess evidence reliability and independence.
+            evidence_assessment = confidence_engine.assess(
+                correlation=evidence_correlation,
+                baseline_score=baseline_assessment.score,
+                baseline_severity=baseline_assessment.severity,
+            )
+
             security_reasoning_response = security_reasoning.model_dump()
+
             security_reasoning_response["evidence_correlation"] = (
                 evidence_correlation.model_dump()
             )
 
+            security_reasoning_response["evidence_assessment"] = (
+                evidence_assessment.model_dump()
+            )
+
+            # 11. Serialize the optional ML prediction.
             if ml_predictions is None or ml_probabilities is None:
                 ml_assessment = {
                     "available": False,
@@ -390,6 +406,7 @@ def assess_openapi(
 
             endpoint_assessments.append(endpoint_assessment)
 
+        # 12. Calculate assessment summary counters.
         evidence_matched_count = sum(
             assessment["security_evidence"]["has_security_evidence"]
             for assessment in endpoint_assessments
@@ -413,6 +430,37 @@ def assess_openapi(
             for assessment in endpoint_assessments
         )
 
+        high_evidence_strength_count = sum(
+            assessment["security_reasoning"][
+                "evidence_assessment"
+            ]["evidence_strength"]["level"] == "high"
+            for assessment in endpoint_assessments
+        )
+
+        high_priority_count = sum(
+            assessment["security_reasoning"][
+                "evidence_assessment"
+            ]["risk_prioritization"]["priority_level"]
+            in ("high", "critical")
+            for assessment in endpoint_assessments
+        )
+
+        average_evidence_strength = (
+            round(
+                sum(
+                    assessment["security_reasoning"][
+                        "evidence_assessment"
+                    ]["evidence_strength"]["score"]
+                    for assessment in endpoint_assessments
+                )
+                / len(endpoint_assessments),
+                2,
+            )
+            if endpoint_assessments
+            else 0.0
+        )
+
+        # 13. Build the assessment response.
         response = {
             "status": "success",
             "assessment_type": "openapi_static_analysis",
@@ -446,6 +494,15 @@ def assess_openapi(
                 "evidence_correlation_relationships": (
                     correlation_relationship_count
                 ),
+                "high_evidence_strength_endpoints": (
+                    high_evidence_strength_count
+                ),
+                "high_or_critical_priority_endpoints": (
+                    high_priority_count
+                ),
+                "average_evidence_strength": (
+                    average_evidence_strength
+                ),
                 "ml_predictions_available": (
                     ml_predictions is not None
                     and ml_probabilities is not None
@@ -454,7 +511,7 @@ def assess_openapi(
             "endpoint_assessments": endpoint_assessments,
         }
 
-        # Add assessment-level SHAP information only when requested.
+        # 14. Add assessment-level SHAP information only when requested.
         if include_explanations:
             if shap_explanations is not None:
                 response["shap_explainability"] = {
