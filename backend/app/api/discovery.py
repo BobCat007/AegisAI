@@ -14,6 +14,10 @@ from ai.risk_prediction.explainability import (
 from ai.risk_prediction.xgboost_model import XGBoostRiskPredictionModel
 from ai.security_context_features import build_security_context_feature_vector
 from ai.security_context_schema import SECURITY_CONTEXT_FEATURE_NAMES
+from ai.security_reasoning import (
+    EvidenceCorrelationEngine,
+    SecurityReasoningEngine,
+)
 from api_discovery.service import discover_api
 from risk_engine.scorer import calculate_risk
 
@@ -196,10 +200,13 @@ def assess_openapi(
     include_explanations: bool = False,
 ):
     """
-    Run static API assessment with optional ML and SHAP explanations.
+    Run static API assessment with optional ML, SHAP, and security reasoning.
 
     SHAP explanations are generated only when include_explanations
     is explicitly enabled and a trained model artifact is available.
+
+    Security reasoning uses endpoint classification and documented
+    security evidence. It does not independently confirm vulnerabilities.
     """
 
     try:
@@ -251,7 +258,11 @@ def assess_openapi(
                     inventory.object_operation_surfaces,
                 )
 
-        # 6. Assess every endpoint independently.
+        # 6. Initialize reasoning and evidence correlation engines.
+        reasoning_engine = SecurityReasoningEngine()
+        correlation_engine = EvidenceCorrelationEngine()
+
+        # 7. Assess every endpoint independently.
         endpoint_assessments = []
 
         for index, endpoint in enumerate(inventory.endpoints):
@@ -278,6 +289,37 @@ def assess_openapi(
                     and item.method.upper() == endpoint.method.upper()
                 )
             ]
+
+            # 8. Generate human-readable security reasoning.
+            security_reasoning = reasoning_engine.analyze_endpoint(
+                endpoint,
+                documented_evidence=CRAPI_SECURITY_EVIDENCE,
+                object_surfaces=inventory.object_operation_surfaces,
+                shap_explanation=(
+                    shap_explanations[index]
+                    if shap_explanations is not None
+                    else None
+                ),
+            )
+
+            # 9. Normalize endpoint evidence and correlate its signals.
+            normalized_evidence = correlation_engine.normalize_endpoint(
+                reasoning=security_reasoning,
+                predicted_label=predicted_label,
+                ml_prediction_available=(
+                    ml_predictions is not None
+                    and ml_probabilities is not None
+                ),
+            )
+
+            evidence_correlation = correlation_engine.correlate(
+                normalized_evidence
+            )
+
+            security_reasoning_response = security_reasoning.model_dump()
+            security_reasoning_response["evidence_correlation"] = (
+                evidence_correlation.model_dump()
+            )
 
             if ml_predictions is None or ml_probabilities is None:
                 ml_assessment = {
@@ -325,6 +367,7 @@ def assess_openapi(
                         for item in matching_evidence
                     ],
                 },
+                "security_reasoning": security_reasoning_response,
             }
 
             # Preserve the existing response by adding this field
@@ -349,6 +392,24 @@ def assess_openapi(
 
         evidence_matched_count = sum(
             assessment["security_evidence"]["has_security_evidence"]
+            for assessment in endpoint_assessments
+        )
+
+        reasoning_finding_count = sum(
+            len(assessment["security_reasoning"]["findings"])
+            for assessment in endpoint_assessments
+        )
+
+        reasoning_review_count = sum(
+            assessment["security_reasoning"]["overall_assessment"]
+            != "no_review_signal"
+            for assessment in endpoint_assessments
+        )
+
+        correlation_relationship_count = sum(
+            assessment["security_reasoning"][
+                "evidence_correlation"
+            ]["total_relationships"]
             for assessment in endpoint_assessments
         )
 
@@ -377,6 +438,13 @@ def assess_openapi(
                 ),
                 "endpoints_matching_documented_evidence": (
                     evidence_matched_count
+                ),
+                "security_reasoning_endpoints_requiring_review": (
+                    reasoning_review_count
+                ),
+                "security_reasoning_findings": reasoning_finding_count,
+                "evidence_correlation_relationships": (
+                    correlation_relationship_count
                 ),
                 "ml_predictions_available": (
                     ml_predictions is not None
