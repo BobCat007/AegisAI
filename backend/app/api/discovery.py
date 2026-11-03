@@ -6,6 +6,12 @@ from fastapi import APIRouter, HTTPException
 from ai.graph_intelligence.builder import build_security_graph
 from ai.graph_intelligence.explanation_mapper import GraphExplanationMapper
 from ai.graph_intelligence.features import extract_graph_features
+from ai.graph_intelligence.relationships import ResourceRelationshipExtractor
+from ai.graph_intelligence.attack_chain import build_attack_chains
+from ai.graph_intelligence.attack_chain_ranker import (
+    AttackChainRanker,
+    rank_attack_chains,
+)
 from ai.risk_prediction.evidence import CRAPI_SECURITY_EVIDENCE
 from ai.risk_prediction.evidence_evaluator import evaluate_against_evidence
 from ai.risk_prediction.explainability import RiskPredictionExplainer
@@ -207,6 +213,36 @@ def assess_openapi(
     try:
         # 1. Discover endpoints.
         inventory = discover_api(spec)
+
+        # 1a. Infer resource relationships and bounded structural paths.
+        # This layer is independent of the existing ML/SHAP feature pipeline.
+        relationship_graph = ResourceRelationshipExtractor(spec).extract()
+        attack_chain_result = rank_attack_chains(
+            build_attack_chains(relationship_graph)
+        )
+
+        attack_chain_analysis = attack_chain_result.model_dump()
+        for chain_data, chain_model in zip(
+            attack_chain_analysis["chains"],
+            attack_chain_result.chains,
+        ):
+            chain_data["priority_score"] = AttackChainRanker.score(chain_model)
+
+        attack_chain_analysis.update(
+            {
+                "analysis_type": "inferred_structural_paths",
+                "not_confirmed_exploits": True,
+                "score_interpretation": (
+                    "Priority score is a relationship-confidence and path-length "
+                    "heuristic, not an exploit probability."
+                ),
+                "limitations": (
+                    "Paths are inferred from OpenAPI structure and do not prove "
+                    "runtime reachability, authorization bypass, object ownership, "
+                    "or exploitability."
+                ),
+            }
+        )
 
         # 2. Build the API security graph.
         graph = build_security_graph(
@@ -487,6 +523,8 @@ def assess_openapi(
             "evidence_catalog": "CRAPI_SECURITY_EVIDENCE",
             "inventory": inventory.model_dump(),
             "security_graph": graph.model_dump(),
+            "resource_relationship_graph": relationship_graph.model_dump(),
+            "attack_chain_analysis": attack_chain_analysis,
             "graph_features": graph_features,
             "ml_model": {
                 "available": risk_model is not None,
@@ -499,6 +537,13 @@ def assess_openapi(
                 "total_object_surfaces": len(
                     inventory.object_operation_surfaces
                 ),
+                "resource_relationship_count": len(
+                    relationship_graph.relationships
+                ),
+                "inferred_attack_chain_count": (
+                    attack_chain_result.total_chains_found
+                ),
+                "attack_chain_analysis_truncated": attack_chain_result.truncated,
                 "assessed_endpoints": len(endpoint_assessments),
                 "security_context_feature_count": len(
                     SECURITY_CONTEXT_FEATURE_NAMES
