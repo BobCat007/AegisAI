@@ -229,3 +229,81 @@ def test_bfla_api_maps_assessment_errors(
     )
 
     assert response.status_code == expected_status
+
+
+@pytest.mark.parametrize(
+    ("path", "payload_factory", "finding_type", "expected_reference"),
+    [
+        ("/api/authorization/bola/assess", valid_bola_payload, "bola", "bola:document-123"),
+        ("/api/authorization/bfla/assess", valid_bfla_payload, "bfla", "bfla:admin-resource"),
+    ],
+)
+def test_authorization_success_ingests_finding(
+    monkeypatch, path, payload_factory, finding_type, expected_reference
+):
+    enable_api(monkeypatch)
+    calls = []
+
+    class IngestionSpy:
+        def ingest_authorization(self, finding, source_reference):
+            calls.append((finding, source_reference))
+
+    monkeypatch.setattr(
+        "backend.app.api.authorization.get_knowledge_ingestion_service",
+        lambda: IngestionSpy(),
+    )
+    monkeypatch.setattr(
+        "backend.app.api.authorization.get_orchestrator", lambda: FakeOrchestrator()
+    )
+    response = client.post(path, headers=API_HEADERS, json=payload_factory())
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "success"
+    assert len(calls) == 1
+    assert calls[0][0] == response.json()["finding"]
+    assert calls[0][0]["finding_type"] == finding_type
+    assert calls[0][1] == expected_reference
+
+
+def test_authorization_does_not_ingest_without_valid_api_key(monkeypatch):
+    enable_api(monkeypatch)
+    calls = []
+
+    class IngestionSpy:
+        def ingest_authorization(self, finding, source_reference):
+            calls.append((finding, source_reference))
+
+    monkeypatch.setattr(
+        "backend.app.api.authorization.get_knowledge_ingestion_service",
+        lambda: IngestionSpy(),
+    )
+    response = client.post(
+        "/api/authorization/bfla/assess", json=valid_bfla_payload()
+    )
+
+    assert response.status_code == 401
+    assert calls == []
+
+
+def test_authorization_success_is_not_failed_by_ingestion_error(monkeypatch):
+    enable_api(monkeypatch)
+
+    class FailingIngestion:
+        def ingest_authorization(self, finding, source_reference):
+            raise RuntimeError("simulated knowledge index failure")
+
+    monkeypatch.setattr(
+        "backend.app.api.authorization.get_knowledge_ingestion_service",
+        lambda: FailingIngestion(),
+    )
+    monkeypatch.setattr(
+        "backend.app.api.authorization.get_orchestrator", lambda: FakeOrchestrator()
+    )
+    response = client.post(
+        "/api/authorization/bfla/assess",
+        headers=API_HEADERS,
+        json=valid_bfla_payload(),
+    )
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "success"

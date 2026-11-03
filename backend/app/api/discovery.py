@@ -1,3 +1,4 @@
+import logging
 from pathlib import Path
 from typing import Any
 
@@ -26,6 +27,9 @@ from ai.security_reasoning import (
 )
 from api_discovery.service import discover_api
 from risk_engine.scorer import calculate_risk
+from ai.knowledge.ingestion import get_knowledge_ingestion_service
+
+logger = logging.getLogger(__name__)
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
@@ -614,6 +618,13 @@ def assess_openapi(
                         "features are required for SHAP explanations."
                     ),
                 }
+
+        try:
+            get_knowledge_ingestion_service().ingest_discovery(response)
+        except Exception:
+            logger.exception(
+                "Knowledge ingestion failed after successful Discovery assessment"
+            )
 
         return response
 

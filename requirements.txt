@@ -4,8 +4,9 @@ pydantic
 pydantic-settings
 python-dotenv
 pytest
-httpx2
+httpx
 xgboost
 scikit-learn
 shap==0.51.0
 trustme>=1.2,<2
+google-genai>=1.0.0

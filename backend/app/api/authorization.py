@@ -1,4 +1,5 @@
 import hmac
+import logging
 import os
 import ssl
 
@@ -11,6 +12,9 @@ from ai.authorization.models import (
 )
 from ai.authorization.orchestrator import AuthorizationTestOrchestrator
 from ai.authorization.target_policy import AuthorizationTargetPolicy
+from ai.knowledge.ingestion import get_knowledge_ingestion_service
+
+logger = logging.getLogger(__name__)
 
 
 router = APIRouter(
@@ -47,7 +51,7 @@ def require_authorization_api_key(
 ) -> None:
     enabled = os.getenv(
         "AEGISAI_AUTH_API_ENABLED", ""
-    ).lower() == "true"
+    ).strip().lower() in {"1", "true", "yes", "on"}
 
     if not enabled:
         raise HTTPException(
@@ -125,9 +129,18 @@ def assess_bola(
     except (ValueError, TimeoutError, ConnectionError, OSError, ssl.SSLError) as exc:
         handle_assessment_error(exc)
 
+    finding_data = finding.model_dump()
+    try:
+        get_knowledge_ingestion_service().ingest_authorization(
+            finding_data,
+            f"bola:{request.resource_id}",
+        )
+    except Exception:
+        logger.exception("Knowledge ingestion failed after successful BOLA assessment")
+
     return {
         "status": "success",
-        "finding": finding.model_dump(),
+        "finding": finding_data,
         "limitations": [
             "The result is based on the supplied owner and cross-user probes.",
             "Response fingerprints are supporting evidence, not proof of identical protected data.",
@@ -160,9 +173,18 @@ def assess_bfla(
     except (ValueError, TimeoutError, ConnectionError, OSError, ssl.SSLError) as exc:
         handle_assessment_error(exc)
 
+    finding_data = finding.model_dump()
+    try:
+        get_knowledge_ingestion_service().ingest_authorization(
+            finding_data,
+            f"bfla:{request.resource_id}",
+        )
+    except Exception:
+        logger.exception("Knowledge ingestion failed after successful BFLA assessment")
+
     return {
         "status": "success",
-        "finding": finding.model_dump(),
+        "finding": finding_data,
         "limitations": [
             "The result depends on the supplied role and function policy.",
             "A response status alone cannot establish the full authorization policy.",

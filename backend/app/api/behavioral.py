@@ -1,6 +1,11 @@
+import logging
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
+
+from ai.knowledge.ingestion import get_knowledge_ingestion_service
+
+logger = logging.getLogger(__name__)
 
 from ai.behavioral_intelligence import (
     BehavioralAssessmentRequest,
@@ -57,6 +62,20 @@ def assess_behavior(
             for result in results
         )
 
+        serialized_results = [
+            result.model_dump() for result in results
+        ]
+
+        try:
+            get_knowledge_ingestion_service().ingest_behavioral(
+                serialized_results,
+                "behavioral_assessment",
+            )
+        except Exception:
+            logger.exception(
+                "Knowledge ingestion failed after successful behavioral assessment"
+            )
+
         return {
             "status": "success",
             "model_type": "isolation_forest",
@@ -64,10 +83,7 @@ def assess_behavior(
             "training_data": "synthetic",
             "observations_assessed": len(results),
             "anomalous_observations": anomalous_count,
-            "results": [
-                result.model_dump()
-                for result in results
-            ],
+            "results": serialized_results,
             "limitations": [
                 "The current model was trained using synthetic baseline data.",
                 "Synthetic training validates the pipeline only.",

@@ -300,3 +300,35 @@ def test_static_assessment_continues_when_model_artifact_is_missing(
         assert prediction["class_probabilities"] is None
         assert "baseline_risk" in assessment
         assert "security_evidence" in assessment
+
+
+def test_discovery_ingests_successful_assessment(monkeypatch):
+    calls = []
+
+    class IngestionSpy:
+        def ingest_discovery(self, assessment):
+            calls.append(assessment)
+
+    monkeypatch.setattr(
+        discovery_api, "get_knowledge_ingestion_service", lambda: IngestionSpy()
+    )
+    response = client.post("/api/discovery/assess", json=load_fixture())
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "success"
+    assert len(calls) == 1
+    assert calls[0]["status"] == "success"
+
+
+def test_discovery_success_is_not_failed_by_ingestion_error(monkeypatch):
+    class FailingIngestion:
+        def ingest_discovery(self, assessment):
+            raise RuntimeError("simulated knowledge index failure")
+
+    monkeypatch.setattr(
+        discovery_api, "get_knowledge_ingestion_service", lambda: FailingIngestion()
+    )
+    response = client.post("/api/discovery/assess", json=load_fixture())
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "success"

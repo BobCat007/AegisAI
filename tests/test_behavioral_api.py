@@ -121,3 +121,40 @@ def test_behavioral_api_rejects_empty_observations():
     )
 
     assert response.status_code == 422
+
+
+def test_behavioral_assessment_ingests_returned_results(monkeypatch, tmp_path):
+    train_temporary_model(monkeypatch, tmp_path)
+    calls = []
+
+    class IngestionSpy:
+        def ingest_behavioral(self, results, source_reference):
+            calls.append((results, source_reference))
+
+    monkeypatch.setattr(
+        behavioral_api, "get_knowledge_ingestion_service", lambda: IngestionSpy()
+    )
+    response = client.post("/api/behavior/assess", json=build_payload())
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "success"
+    assert len(calls) == 1
+    assert calls[0][0] == data["results"]
+    assert calls[0][1] == "behavioral_assessment"
+
+
+def test_behavioral_success_is_not_failed_by_ingestion_error(monkeypatch, tmp_path):
+    train_temporary_model(monkeypatch, tmp_path)
+
+    class FailingIngestion:
+        def ingest_behavioral(self, results, source_reference):
+            raise RuntimeError("simulated knowledge index failure")
+
+    monkeypatch.setattr(
+        behavioral_api, "get_knowledge_ingestion_service", lambda: FailingIngestion()
+    )
+    response = client.post("/api/behavior/assess", json=build_payload())
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "success"
