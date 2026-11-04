@@ -56,3 +56,6 @@ data/telemetry/
 
 # Track the safe example environment configuration
 !.env.example
+
+# Runtime incident and alert data (never commit)
+data/incidents/
