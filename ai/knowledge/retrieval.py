@@ -15,6 +15,58 @@ from ai.knowledge.normalizer import sanitize_text
 
 _TOKEN_RE = re.compile(r"[a-zA-Z0-9_./:{}-]+")
 
+_METADATA_STOP_WORDS = ENGLISH_STOP_WORDS | {
+    "analyze", "analysis", "behavioral", "telemetry", "evidence",
+    "explain", "observed", "observation", "anomaly", "anomalies",
+    "supporting", "limitations", "limitation", "endpoint",
+}
+
+_TOKEN_ALIASES = {
+    "authentication": "auth",
+    "authenticating": "auth",
+    "authenticated": "auth",
+    "failures": "failure",
+    "failed": "failure",
+    "failing": "failure",
+    "logins": "login",
+    "credentials": "credential",
+    "signin": "login",
+}
+
+
+def _normalized_tokens(value: object) -> set[str]:
+    """Extract searchable tokens and normalize common security terminology."""
+    tokens: set[str] = set()
+    for raw in _TOKEN_RE.findall(str(value).lower()):
+        for part in re.split(r"[_./:{}-]+", raw):
+            if not part or part in ENGLISH_STOP_WORDS:
+                continue
+            tokens.add(_TOKEN_ALIASES.get(part, part))
+    return tokens
+
+
+def _metadata_tokens(metadata: dict) -> set[str]:
+    """Extract tokens from structured behavioral metadata."""
+    values: list[str] = [
+        str(metadata.get("endpoint_path", "")),
+        str(metadata.get("method", "")),
+        str(metadata.get("classification", "")),
+    ]
+
+    def collect(value: object) -> None:
+        if isinstance(value, dict):
+            for key, item in value.items():
+                values.append(str(key))
+                collect(item)
+        elif isinstance(value, (list, tuple)):
+            for item in value:
+                collect(item)
+        elif isinstance(value, str):
+            values.append(value)
+
+    collect(metadata.get("signals", []))
+    return _normalized_tokens(" ".join(values))
+
 
 class RetrievalQuery(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -54,7 +106,7 @@ class RetrievalResult(BaseModel):
     hits: list[RetrievalHit]
     total_candidates: int
     index_size: int
-    retrieval_method: str = "hybrid_tfidf_exact"
+    retrieval_method: str = "hybrid_tfidf_exact_metadata"
     limitations: list[str] = Field(default_factory=list)
 
 
@@ -126,6 +178,12 @@ class KnowledgeRetriever:
             token.lower() for token in _TOKEN_RE.findall(query)
             if token.lower() not in ENGLISH_STOP_WORDS
         ]
+        focused_query_tokens = {
+            _TOKEN_ALIASES.get(part, part)
+            for token in query_tokens
+            for part in re.split(r"[_./:{}-]+", token)
+            if part and part not in _METADATA_STOP_WORDS
+        }
         candidate_ids = {chunk.chunk_id for chunk in candidates}
         lexical_scores: dict[str, float] = {}
         if self._vectorizer is not None and self._matrix is not None:
@@ -150,7 +208,22 @@ class KnowledgeRetriever:
                 else 0.0
             )
             lexical = lexical_scores.get(chunk.chunk_id, 0.0)
-            score = min(1.0, 0.75 * lexical + 0.25 * exact)
+            base_score = min(1.0, 0.75 * lexical + 0.25 * exact)
+
+            metadata_tokens = _metadata_tokens(chunk.metadata or {})
+            metadata_score = (
+                len(focused_query_tokens & metadata_tokens)
+                / len(focused_query_tokens)
+                if focused_query_tokens
+                else 0.0
+            )
+
+            # Structured metadata improves ranking without replacing
+            # the existing lexical and exact-match relevance signals.
+            score = min(
+                1.0,
+                base_score + 0.35 * metadata_score * (1.0 - base_score),
+            )
             if score <= 0:
                 continue
             hits.append(RetrievalHit(
@@ -208,7 +281,7 @@ class KnowledgeRetriever:
     @staticmethod
     def _limitations() -> list[str]:
         return [
-            "Retrieval is lexical (TF-IDF plus exact token overlap), not semantic embedding search.",
+            "Retrieval combines TF-IDF, exact token overlap, and structured metadata token matching; it is not semantic embedding search.",
             "Scores are relevance-ranking signals, not confidence or vulnerability probabilities.",
             "Retrieved records preserve their source validation status; retrieval does not validate findings.",
             "The index is in-memory and must be rebuilt after application restart.",

@@ -25,7 +25,7 @@ def copilot_status():
         "configured": provider.configured,
         "model": provider.model,
         "knowledge_index_size": get_knowledge_retriever().index_size,
-        "retrieval": "hybrid_tfidf_exact",
+        "retrieval": "hybrid_tfidf_exact_metadata",
     }
 
 

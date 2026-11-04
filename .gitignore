@@ -50,3 +50,9 @@ Thumbs.db
 *.key
 *.bak
 *.pem
+
+# Runtime telemetry data (never commit collected events)
+data/telemetry/
+
+# Track the safe example environment configuration
+!.env.example

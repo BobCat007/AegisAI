@@ -6,6 +6,7 @@ from backend.app.api.behavioral import router as behavioral_router
 from backend.app.api.copilot import router as copilot_router
 from backend.app.api.discovery import router as discovery_router
 from backend.app.api.risk import router as risk_router
+from backend.app.api.telemetry import router as telemetry_router
 
 
 app = FastAPI(
@@ -28,6 +29,7 @@ app.include_router(risk_router)
 app.include_router(behavioral_router)
 app.include_router(authorization_router)
 app.include_router(copilot_router)
+app.include_router(telemetry_router)
 
 
 @app.get("/")

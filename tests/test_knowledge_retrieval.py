@@ -93,3 +93,56 @@ def test_retrieval_limitations_are_explicit():
     result = KnowledgeRetriever().retrieve("BOLA")
     assert any("not semantic" in item for item in result.limitations)
     assert any("in-memory" in item for item in result.limitations)
+
+
+def test_behavioral_metadata_ranks_login_authentication_evidence_first():
+    retriever = KnowledgeRetriever()
+
+    login = document(
+        "login-anomaly",
+        "Behavioral anomalous assessment — POST /api/auth/login",
+        "Classification: anomalous. Data origin: runtime. "
+        "Authentication failure rate was unusually high.",
+        doc_type="behavioral_anomaly",
+    ).model_copy(update={
+        "metadata": {
+            "endpoint_path": "/api/auth/login",
+            "method": "POST",
+            "classification": "anomalous",
+            "signals": [{
+                "name": "auth_failure_rate",
+                "observed": 0.94,
+                "baseline_mean": 0.01,
+            }],
+        }
+    })
+
+    orders = document(
+        "orders-anomaly",
+        "Behavioral anomalous assessment — GET /api/orders",
+        "Classification: anomalous. Unusual response size variation.",
+        doc_type="behavioral_anomaly",
+    ).model_copy(update={
+        "metadata": {
+            "endpoint_path": "/api/orders",
+            "method": "GET",
+            "classification": "anomalous",
+            "signals": [{
+                "name": "response_size_stddev_bytes",
+                "observed": 500,
+            }],
+        }
+    })
+
+    retriever.add_documents([orders, login])
+
+    result = retriever.retrieve(
+        "Analyze behavioral telemetry evidence for authentication "
+        "failures on the login endpoint. Explain observed anomaly, "
+        "supporting evidence, and limitations.",
+        top_k=5,
+    )
+
+    assert result.hits
+    assert result.hits[0].document_id == "login-anomaly"
+    assert result.hits[0].metadata["endpoint_path"] == "/api/auth/login"
