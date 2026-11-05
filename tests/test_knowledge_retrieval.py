@@ -146,3 +146,174 @@ def test_behavioral_metadata_ranks_login_authentication_evidence_first():
     assert result.hits
     assert result.hits[0].document_id == "login-anomaly"
     assert result.hits[0].metadata["endpoint_path"] == "/api/auth/login"
+
+def test_diversity_selection_avoids_duplicate_documents():
+    retriever = KnowledgeRetriever()
+
+    retriever.add_documents([
+        document(
+            "remediation-1",
+            "Authorization remediation",
+            "Apply server side authorization checks and validate resource ownership.",
+            doc_type="remediation",
+        ),
+        document(
+            "remediation-2",
+            "Authorization remediation guidance",
+            "Apply server side authorization checks and validate resource ownership.",
+            doc_type="remediation",
+        ),
+        document(
+            "bola-1",
+            "BOLA object ownership finding",
+            "Broken object level authorization occurs when a user can access "
+            "another account's resource without ownership verification.",
+            doc_type="authorization_finding",
+        ),
+        document(
+            "behavior-1",
+            "Behavioral anomaly detection",
+            "Detect abnormal authentication failure rates and unusual API request patterns.",
+            doc_type="behavioral_anomaly",
+        ),
+    ])
+
+    result = retriever.retrieve(
+        "Summarize relevant API authorization security findings and evidence",
+        top_k=4,
+    )
+
+    document_ids = [hit.document_id for hit in result.hits]
+
+    assert len(document_ids) == len(set(document_ids))
+    assert "bola-1" in document_ids
+
+
+def test_diversity_selection_preserves_remediation_intent():
+    retriever = KnowledgeRetriever()
+
+    retriever.add_documents([
+        document(
+            "finding-1",
+            "Authorization finding",
+            "Users may access another account's records without ownership verification.",
+            doc_type="authorization_finding",
+        ),
+        document(
+            "remediation-1",
+            "Authorization remediation",
+            "Prevent unauthorized access by enforcing server side ownership checks.",
+            doc_type="remediation",
+        ),
+    ])
+
+    result = retriever.retrieve(
+        "How can we prevent unauthorized access and fix authorization issues?",
+        top_k=2,
+    )
+
+    assert result.hits
+    assert result.hits[0].document_type == "remediation"
+
+
+def test_diversity_selection_returns_one_chunk_per_document():
+    from ai.knowledge.retrieval import RetrievalHit
+
+    def hit(chunk_id, document_id, score, content):
+        return RetrievalHit(
+            chunk_id=chunk_id,
+            document_id=document_id,
+            document_type="reasoning_finding",
+            title="Security finding",
+            text=content,
+            source="test",
+            source_reference=f"ref:{document_id}",
+            score=score,
+            lexical_score=score,
+            exact_match_score=score,
+            confirmed=False,
+        )
+
+    candidates = [
+        hit("doc-1:0", "doc-1", 0.90, "authorization ownership access"),
+        hit("doc-1:1", "doc-1", 0.85, "authorization ownership access"),
+        hit("doc-2:0", "doc-2", 0.80, "behavioral anomaly request rate"),
+    ]
+
+    selected = KnowledgeRetriever._select_diverse_hits(
+        candidates,
+        top_k=3,
+    )
+
+    selected_ids = [item.document_id for item in selected]
+
+    assert len(selected_ids) == 2
+    assert len(selected_ids) == len(set(selected_ids))
+
+def test_confirmed_findings_query_excludes_unconfirmed_documents():
+    retriever = KnowledgeRetriever()
+
+    retriever.add_documents([
+        document(
+            "confirmed-1",
+            "Confirmed BOLA finding",
+            "Object ownership violation was confirmed.",
+            confirmed=True,
+        ),
+        document(
+            "unconfirmed-1",
+            "Unvalidated BOLA finding",
+            "Possible object ownership issue.",
+            confirmed=False,
+        ),
+    ])
+
+    result = retriever.retrieve(
+        "What are the confirmed security findings?",
+        top_k=10,
+    )
+
+    assert result.hits
+    assert all(hit.confirmed is True for hit in result.hits)
+    assert [hit.document_id for hit in result.hits] == ["confirmed-1"]
+
+
+def test_confirmed_findings_query_returns_empty_when_none_confirmed():
+    retriever = KnowledgeRetriever()
+
+    retriever.add_documents([
+        document(
+            "finding-1",
+            "Documented BFLA reference",
+            "A documented authorization reference.",
+            confirmed=False,
+        ),
+    ])
+
+    result = retriever.retrieve(
+        "What are the confirmed security findings?",
+        top_k=10,
+    )
+
+    assert result.hits == []
+    assert result.total_candidates == 0
+
+def test_general_security_query_still_includes_unconfirmed_documents():
+    retriever = KnowledgeRetriever()
+
+    retriever.add_documents([
+        document(
+            "finding-1",
+            "Authorization finding",
+            "Review object ownership authorization.",
+            confirmed=False,
+        ),
+    ])
+
+    result = retriever.retrieve(
+        "Summarize authorization security findings.",
+        top_k=5,
+    )
+
+    assert result.hits
+    assert result.hits[0].confirmed is False

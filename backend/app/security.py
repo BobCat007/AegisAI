@@ -106,8 +106,8 @@ def enforce_api_security(request: Request):
     if authorization_route:
         return None
 
-    # Explicit opt-in preserves local development and the existing test suite.
-    if not _enabled("AEGISAI_API_AUTH_ENABLED", False):
+    # Global API authentication is enabled by default; disable only for local development.
+    if not _enabled("AEGISAI_API_AUTH_ENABLED", True):
         return None
 
     expected_key = os.getenv("AEGISAI_API_KEY", "").strip()

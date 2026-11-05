@@ -134,11 +134,23 @@ class GeminiProvider:
             ) from exc
         except Exception as exc:
             error_name = type(exc).__name__
-            rate_limited = error_name in {
-                "ResourceExhausted",
-                "TooManyRequests",
-                "RateLimitError",
-            }
+            provider_status = getattr(exc, "code", None)
+            if provider_status is None:
+                provider_status = getattr(exc, "status_code", None)
+
+            try:
+                provider_status = int(provider_status)
+            except (TypeError, ValueError):
+                provider_status = None
+
+            rate_limited = (
+                provider_status == 429
+                or error_name in {
+                    "ResourceExhausted",
+                    "TooManyRequests",
+                    "RateLimitError",
+                }
+            )
             status_code = 429 if rate_limited else 502
             message = (
                 "Gemini rate limit or quota reached. Check your Google AI Studio "

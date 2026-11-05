@@ -98,3 +98,17 @@ def test_rate_limiter_bounds_buckets_and_reclaims_expired_entries(monkeypatch):
 
     finally:
         reset_rate_limit_state()
+
+
+def test_global_api_auth_is_enabled_by_default(monkeypatch):
+    monkeypatch.delenv("AEGISAI_API_AUTH_ENABLED", raising=False)
+    monkeypatch.setenv("AEGISAI_API_KEY", "test-global-secret")
+
+    rejected = client.get("/api/copilot/status")
+    assert rejected.status_code == 401
+
+    accepted = client.get(
+        "/api/copilot/status",
+        headers={"X-AegisAI-API-Key": "test-global-secret"},
+    )
+    assert accepted.status_code == 200

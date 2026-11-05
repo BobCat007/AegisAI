@@ -1,9 +1,18 @@
 """External batch telemetry ingestion and incident correlation API."""
 
 import logging
+from collections import Counter
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, HTTPException, Query
 
+from ai.alerts import (
+    AlertEngine,
+    AlertStatus,
+    AlertStatusUpdate as AlertStatusUpdateRequest,
+    AlertStore,
+    AlertTransition,
+)
 from ai.telemetry.models import TelemetryBatch
 from ai.telemetry.processor import aggregate_events
 from ai.telemetry.store import TelemetryEventStore
@@ -176,6 +185,88 @@ def get_telemetry_incidents(
             detail="Incident correlation is temporarily unavailable.",
         )
 
+MAX_ANALYTICS_EVENTS = 50000
+
+
+@router.get("/analytics")
+def get_telemetry_analytics(
+    lookback_minutes: int = Query(default=60, ge=1, le=1440),
+    bucket_minutes: int = Query(default=5, ge=1, le=60),
+):
+    """Return privacy-conscious analytics from retained telemetry metadata."""
+    try:
+        events = get_telemetry_store().read_events(
+            limit=MAX_ANALYTICS_EVENTS
+        )
+
+        now = datetime.now(timezone.utc)
+        cutoff = now - timedelta(minutes=lookback_minutes)
+
+        recent = [
+            event for event in events
+            if cutoff <= event.timestamp <= now
+        ]
+
+        bucket_seconds = bucket_minutes * 60
+        start_epoch = int(cutoff.timestamp()) // bucket_seconds * bucket_seconds
+        end_epoch = int(now.timestamp()) // bucket_seconds * bucket_seconds
+
+        buckets = {}
+        for epoch in range(start_epoch, end_epoch + 1, bucket_seconds):
+            buckets[epoch] = 0
+
+        statuses = Counter()
+        endpoints = Counter()
+        auth_failures = 0
+
+        for event in recent:
+            epoch = int(event.timestamp.timestamp())
+            bucket = epoch // bucket_seconds * bucket_seconds
+
+            if bucket in buckets:
+                buckets[bucket] += 1
+
+            status_group = f"{event.status_code // 100}xx"
+            if status_group in {"2xx", "3xx", "4xx", "5xx"}:
+                statuses[status_group] += 1
+            else:
+                statuses["other"] += 1
+
+            endpoints[event.endpoint_path] += 1
+
+            if event.status_code in (401, 403):
+                auth_failures += 1
+
+        return {
+            "lookback_minutes": lookback_minutes,
+            "bucket_minutes": bucket_minutes,
+            "events_analyzed": len(recent),
+            "request_volume": [
+                {
+                    "timestamp": datetime.fromtimestamp(
+                        epoch, tz=timezone.utc
+                    ).isoformat(),
+                    "count": count,
+                }
+                for epoch, count in buckets.items()
+            ],
+            "status_distribution": {
+                key: statuses.get(key, 0)
+                for key in ("2xx", "3xx", "4xx", "5xx", "other")
+            },
+            "top_endpoints": [
+                {"endpoint": endpoint, "count": count}
+                for endpoint, count in endpoints.most_common(8)
+            ],
+            "authentication_failures": auth_failures,
+        }
+
+    except Exception:
+        logger.exception("Telemetry analytics retrieval failed")
+        raise HTTPException(
+            status_code=503,
+            detail="Telemetry analytics are temporarily unavailable.",
+        )
 
 # Incident response API integration
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -347,14 +438,6 @@ def get_incident_response_audit(incident_id: str):
 
 
 # Alert management API
-from ai.alerts import (
-    AlertEngine,
-    AlertStatus,
-    AlertStatusUpdate as AlertStatusUpdateRequest,
-    AlertStore,
-    AlertTransition,
-)
-
 
 def get_alert_store() -> AlertStore:
     return AlertStore()

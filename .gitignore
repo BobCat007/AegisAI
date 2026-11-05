@@ -59,3 +59,10 @@ data/telemetry/
 
 # Runtime incident and alert data (never commit)
 data/incidents/
+
+# Runtime knowledge index (generated; do not commit)
+data/knowledge/
+
+# Frontend generated files
+frontend/node_modules/
+frontend/dist/

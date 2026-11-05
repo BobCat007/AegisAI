@@ -108,6 +108,29 @@ def test_provider_maps_rate_limit_to_429():
     assert "private detail" not in str(error.value)
 
 
+def test_provider_maps_google_sdk_client_error_429_to_429():
+    from google.genai.errors import ClientError
+
+    class GoogleRateLimitedModels:
+        def generate_content(self, **kwargs):
+            raise ClientError(
+                429,
+                {"message": "private quota details"},
+                None,
+            )
+
+    provider = GeminiProvider(
+        api_key="test-key",
+        client=SimpleNamespace(models=GoogleRateLimitedModels()),
+    )
+
+    with pytest.raises(CopilotProviderError) as error:
+        provider.generate(instructions="x", evidence="[]", question="question")
+
+    assert error.value.status_code == 429
+    assert "private quota details" not in str(error.value)
+
+
 def test_service_preserves_retrieval_provenance_and_validation():
     retriever = KnowledgeRetriever()
     retriever.add_documents([make_document()])
@@ -123,6 +146,24 @@ def test_service_preserves_retrieval_provenance_and_validation():
     assert result.citations[0]["validation_status"] == "not_validated"
     assert result.citations[0]["confirmed"] is False
     assert "not independent security validation" in " ".join(result.limitations)
+
+
+def test_service_describes_persisted_api_knowledge_index_correctly():
+    retriever = KnowledgeRetriever()
+    retriever.add_documents([make_document()])
+    service = SecurityCopilot(
+        retriever,
+        GeminiProvider(api_key="test-key", client=FakeClient()),
+    )
+
+    result = service.ask(
+        CopilotQuestion(question="authorization ownership check")
+    )
+
+    limitations = " ".join(result.limitations)
+    assert "retriever instance is in-memory" in limitations
+    assert "rebuilt from the configured persisted knowledge store" in limitations
+    assert "resets when the backend restarts" not in limitations
 
 
 def test_service_applies_unconfirmed_filter():

@@ -61,7 +61,7 @@ class SecurityCopilot:
         limitations.extend([
             "Model output is not independent security validation; it is an explanation of retrieved context.",
             "Citations identify retrieved records and do not imply that a finding is confirmed.",
-            "The current knowledge index is in-memory and resets when the backend restarts.",
+            "This retriever instance is in-memory. In the API, the shared knowledge index is rebuilt from the configured persisted knowledge store when the backend starts.",
         ])
 
         # Do not call the external model when retrieval provides no evidence.
