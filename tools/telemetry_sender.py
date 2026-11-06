@@ -95,12 +95,20 @@ def send_events(
     endpoint: str,
     api_key: str | None = None,
     batch_size: int = 100,
+    max_retries: int = 0,
+    retry_delay: float = 1.0,
 ) -> list[dict]:
     if not endpoint.startswith(("http://", "https://")):
         raise ValueError("Endpoint must use HTTP or HTTPS")
 
     if not 1 <= batch_size <= 500:
         raise ValueError("batch_size must be between 1 and 500")
+
+    if max_retries < 0:
+        raise ValueError("max_retries cannot be negative")
+
+    if retry_delay < 0:
+        raise ValueError("retry_delay cannot be negative")
 
     headers = {"Content-Type": "application/json"}
     if api_key:
@@ -119,20 +127,86 @@ def send_events(
             method="POST",
         )
 
-        try:
-            with urllib.request.urlopen(request, timeout=30) as response:
-                result = json.loads(response.read().decode())
-                responses.append(result)
-                print(json.dumps(result, indent=2))
-        except urllib.error.HTTPError as exc:
-            detail = exc.read().decode(errors="replace")
-            raise RuntimeError(
-                f"Server returned HTTP {exc.code}: {detail}"
-            ) from exc
-        except urllib.error.URLError as exc:
-            raise RuntimeError(f"Could not reach AegisAI: {exc}") from exc
+        attempt = 0
+        while True:
+            try:
+                with urllib.request.urlopen(request, timeout=30) as response:
+                    result = json.loads(response.read().decode())
+                    responses.append(result)
+                    print(json.dumps(result, indent=2))
+                    break
+            except urllib.error.HTTPError as exc:
+                detail = exc.read().decode(errors="replace")
+                retryable = exc.code in (408, 429) or exc.code >= 500
+                if not retryable or attempt >= max_retries:
+                    raise RuntimeError(
+                        f"Server returned HTTP {exc.code}: {detail}"
+                    ) from exc
+                error_message = f"HTTP {exc.code}: {detail}"
+            except urllib.error.URLError as exc:
+                if attempt >= max_retries:
+                    raise RuntimeError(
+                        f"Could not reach AegisAI after {attempt + 1} "
+                        f"attempt(s): {exc}"
+                    ) from exc
+                error_message = str(exc)
+
+            attempt += 1
+            delay = retry_delay * (2 ** (attempt - 1))
+            print(
+                f"Delivery attempt {attempt}/{max_retries} failed: "
+                f"{error_message}. Retrying in {delay:.1f}s...",
+                file=sys.stderr,
+            )
+            time.sleep(delay)
 
     return responses
+
+
+def run_continuous(
+    endpoint: str,
+    count: int = 100,
+    scenario: str = "normal",
+    interval: float = 5.0,
+    batch_size: int = 100,
+    api_key: str | None = None,
+    max_retries: int = 3,
+    retry_delay: float = 1.0,
+) -> None:
+    """Generate and deliver telemetry batches until interrupted."""
+    if interval <= 0:
+        raise ValueError("interval must be greater than zero")
+    if max_retries < 0:
+        raise ValueError("max_retries cannot be negative")
+    if retry_delay < 0:
+        raise ValueError("retry_delay cannot be negative")
+
+    cycle = 0
+    print(
+        f"Starting continuous telemetry: scenario={scenario}, "
+        f"events_per_cycle={count}, interval={interval}s, endpoint={endpoint}"
+    )
+    print("Press Ctrl+C to stop.")
+
+    while True:
+        cycle += 1
+        events = generate_events(count, scenario)
+        print(f"\nCycle {cycle}: generated {len(events)} events.")
+
+        send_events(
+            events,
+            endpoint,
+            api_key=api_key,
+            batch_size=batch_size,
+            max_retries=max_retries,
+            retry_delay=retry_delay,
+        )
+
+        print(
+            f"Cycle {cycle} delivered successfully. "
+            f"Waiting {interval}s for the next batch."
+        )
+        time.sleep(interval)
 
 
 def main():
@@ -166,6 +240,25 @@ def main():
     )
     send.add_argument("--batch-size", type=int, default=100)
 
+    continuous = subparsers.add_parser(
+        "continuous",
+        help="Generate and send telemetry batches continuously",
+    )
+    continuous.add_argument(
+        "--url",
+        default="http://127.0.0.1:8000/api/telemetry/events",
+    )
+    continuous.add_argument("--count", type=int, default=100)
+    continuous.add_argument(
+        "--scenario",
+        choices=["normal", "suspicious", "mixed"],
+        default="normal",
+    )
+    continuous.add_argument("--interval", type=float, default=5.0)
+    continuous.add_argument("--batch-size", type=int, default=100)
+    continuous.add_argument("--max-retries", type=int, default=3)
+    continuous.add_argument("--retry-delay", type=float, default=1.0)
+
     args = parser.parse_args()
 
     try:
@@ -189,6 +282,21 @@ def main():
                 args.batch_size,
             )
 
+        elif args.command == "continuous":
+            run_continuous(
+                endpoint=args.url,
+                count=args.count,
+                scenario=args.scenario,
+                interval=args.interval,
+                batch_size=args.batch_size,
+                api_key=os.getenv("AEGISAI_API_KEY"),
+                max_retries=args.max_retries,
+                retry_delay=args.retry_delay,
+            )
+
+    except KeyboardInterrupt:
+        print("\nContinuous telemetry stopped by user.")
+        return 0
     except (ValueError, RuntimeError, OSError) as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 1

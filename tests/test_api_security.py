@@ -57,14 +57,29 @@ def test_rate_limiter_returns_429_after_configured_limit(monkeypatch):
     monkeypatch.setenv("AEGISAI_RATE_LIMIT_WINDOW_SECONDS", "60")
 
     try:
-        path = "/api/security-test-rate-limit"
-        first = client.get(path)
-        second = client.get(path)
+        first = client.get("/api/security-test-rate-limit")
+        second = client.get("/api/security-test-rate-limit")
 
-        # The first request reaches routing (this path intentionally does not exist).
         assert first.status_code == 404
         assert second.status_code == 429
         assert "Retry-After" in second.headers
+    finally:
+        reset_rate_limit_state()
+
+
+def test_rate_limit_is_shared_across_api_routes(monkeypatch):
+    reset_rate_limit_state()
+    monkeypatch.setenv("AEGISAI_API_AUTH_ENABLED", "false")
+    monkeypatch.setenv("AEGISAI_RATE_LIMIT_ENABLED", "true")
+    monkeypatch.setenv("AEGISAI_RATE_LIMIT_REQUESTS", "1")
+    monkeypatch.setenv("AEGISAI_RATE_LIMIT_WINDOW_SECONDS", "60")
+
+    try:
+        first = client.get("/api/security-test-route-one")
+        second = client.get("/api/security-test-route-two")
+
+        assert first.status_code == 404
+        assert second.status_code == 429
     finally:
         reset_rate_limit_state()
 
@@ -82,20 +97,18 @@ def test_rate_limiter_bounds_buckets_and_reclaims_expired_entries(monkeypatch):
     monkeypatch.setattr(security.time, "monotonic", lambda: clock["now"])
 
     try:
-        first = client.get("/api/security-capacity-first")
-        assert first.status_code == 404
+        assert security._rate_limit_response("client-a") is None
 
-        # The only bucket is active, so a second distinct path is rejected.
+        # A second client cannot allocate a bucket while capacity is full.
         clock["now"] = 101.0
-        blocked = client.get("/api/security-capacity-second")
+        blocked = security._rate_limit_response("client-b")
         assert blocked.status_code == 503
         assert "Retry-After" in blocked.headers
 
-        # Once the original bucket expires, its space can be reused.
+        # Expired entries are reclaimed.
         clock["now"] = 161.0
-        recovered = client.get("/api/security-capacity-second")
-        assert recovered.status_code == 404
-
+        recovered = security._rate_limit_response("client-b")
+        assert recovered is None
     finally:
         reset_rate_limit_state()
 
@@ -112,3 +125,28 @@ def test_global_api_auth_is_enabled_by_default(monkeypatch):
         headers={"X-AegisAI-API-Key": "test-global-secret"},
     )
     assert accepted.status_code == 200
+
+
+def test_security_headers_are_present_on_successful_response(monkeypatch):
+    monkeypatch.setenv("AEGISAI_API_AUTH_ENABLED", "false")
+
+    response = client.get("/health")
+
+    assert response.status_code == 200
+    assert response.headers["X-Content-Type-Options"] == "nosniff"
+    assert response.headers["X-Frame-Options"] == "DENY"
+    assert response.headers["Referrer-Policy"] == "strict-origin-when-cross-origin"
+    assert response.headers["Permissions-Policy"] == (
+        "camera=(), microphone=(), geolocation=()"
+    )
+
+
+def test_security_headers_are_present_on_rejected_response(monkeypatch):
+    monkeypatch.setenv("AEGISAI_API_AUTH_ENABLED", "true")
+    monkeypatch.delenv("AEGISAI_API_KEY", raising=False)
+
+    response = client.get("/api/copilot/status")
+
+    assert response.status_code == 503
+    assert response.headers["X-Content-Type-Options"] == "nosniff"
+    assert response.headers["X-Frame-Options"] == "DENY"

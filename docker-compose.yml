@@ -1,0 +1,59 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      AEGISAI_TELEMETRY_PATH: /app/data/telemetry/events.jsonl
+      AEGISAI_RESPONSE_AUDIT_PATH: /app/data/incidents/response_audit.jsonl
+      AEGISAI_ALERT_PATH: /app/data/incidents/alerts.jsonl
+      AEGISAI_API_AUTH_ENABLED: ${AEGISAI_API_AUTH_ENABLED:-true}
+    volumes:
+      - ./data:/app/data
+    user: "${AEGISAI_UID:-1000}:${AEGISAI_GID:-1000}"
+    init: true
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=5)"
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    restart: unless-stopped
+    environment:
+      AEGISAI_API_KEY: ${AEGISAI_API_KEY:?Set AEGISAI_API_KEY in .env}
+    ports:
+      - "127.0.0.1:8080:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

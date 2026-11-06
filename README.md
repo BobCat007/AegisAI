@@ -474,31 +474,15 @@ These cases are being used as evaluation evidence rather than as training labels
 
 # Testing
 
-AegisAI uses automated testing throughout the development process.
+AegisAI uses automated regression testing throughout development.
 
-Current test coverage includes:
+The verified test suite covers API discovery, security classification, graph intelligence, risk prediction, behavioral detection, authorization analysis, explainability, Copilot, knowledge retrieval, telemetry, incident response, investigation workflows, and API security controls.
 
-* API discovery
-* endpoint classification
-* feature extraction
-* feature schema validation
-* graph construction
-* graph feature extraction
-* security-context construction
-* training-data generation
-* risk prediction data loading
-* XGBoost model behavior
-* authorization models
-* authorization probe execution
-* API risk-assessment endpoints
+Latest verified results:
+- Python: 573 passed, 4 dependency deprecation warnings.
+- Frontend production build: passed.
 
-Current verified test status:
-
-```text
-154 passed
-```
-
-The project treats automated regression testing as part of the development workflow rather than as a final-stage activity.
+These are local verification results, not production benchmarks.
 
 ---
 
@@ -506,52 +490,36 @@ The project treats automated regression testing as part of the development workf
 
 ### Implemented
 
-* OpenAPI API discovery
-* Endpoint inventory
-* Endpoint security classification
-* Sensitive parameter detection
-* Sensitive response-field detection
-* Object identifier extraction
-* Object operation surface modeling
-* 25-feature endpoint security representation
-* API security graph construction
-* Graph security features
-* Target-aware graph features
-* 31-feature security context
-* 32-feature target-aware security context
-* Synthetic graph-aware training data generation
-* Risk prediction dataset validation
-* XGBoost risk prediction foundation
-* Stratified cross-validation experiment
-* Independent security evidence evaluation
-* Controlled authorization probe models
-* Controlled authorization probe client
-* Automated regression test suite
+- OpenAPI API discovery and endpoint inventory
+- Security classification and sensitive-data detection
+- Security feature representation and graph intelligence
+- Risk prediction and XGBoost model
+- Behavioral anomaly detection using Isolation Forest
+- Authorization analysis and controlled probing
+- Explainable AI and security evidence correlation
+- Attack-chain reconstruction
+- LLM security copilot and RAG knowledge retrieval
+- Analyst investigation workflows
+- Real-time telemetry ingestion
+- Incident correlation and alert generation
+- Dry-run response planning and audit persistence
+- Security dashboard
+- API authentication, rate limiting, and security headers
+- Docker-based backend and frontend deployment
 
-### In Development
+### Operational limitations
 
-* Expanded risk-prediction experiments
-* More realistic security datasets
-* Behavioral anomaly detection
-* Advanced graph security analysis
-* Authorization behavior analysis
-* Explainability pipeline
-* Security evidence correlation
+- Behavioral model validation includes synthetic data; production effectiveness is not established.
+- Automated response execution remains dry-run only.
+- Rate limiting is in-memory and process-local.
+- The current deployment is intended for local use, not security-certified public multi-user exposure.
+- Copilot requires a configured provider API key.
 
-### Planned
+---
 
-* Isolation Forest anomaly detection
-* Autoencoder behavioral detection
-* Transformer-based behavioral modeling
-* Graph Attention Networks
-* SHAP-based explanations
-* LLM security copilot
-* RAG security knowledge layer
-* Attack-chain reconstruction
-* Automated response recommendations
-* Real-time API telemetry pipeline
-* Security dashboard
-* Extended evaluation against real-world API security scenarios
+# Deployment
+
+See docs/DEPLOYMENT.md for Docker deployment, environment configuration, health checks, persistence, and security considerations.
 
 ---
 
@@ -871,25 +839,15 @@ For substantial changes, please open an issue first to discuss the proposed appr
 
 # Project Status
 
-**Current version:** `0.1.0`
+**Target release:** `1.0.0`
 
-**Development status:** Active development
+**Status:** Release candidate — verification complete; official release approval pending
 
-**Current focus:**
+**Platform capabilities:**
 
-```text
-API Discovery
-      ↓
-Security Feature Representation
-      ↓
-Graph Intelligence
-      ↓
-Risk Prediction
-      ↓
-Authorization Analysis
-```
+API discovery, security intelligence, risk analysis, behavioral and graph-based detection, explainability, investigation, LLM security assistance, real-time telemetry, incident correlation, response planning, auditing, and containerized deployment.
 
-The project is currently focused on establishing a reliable security-intelligence foundation before adding more complex AI components.
+The v1.0 milestone focuses on deployment reliability, persistence, security controls, regression testing, and documentation. Official release approval is pending.
 
 ---
 

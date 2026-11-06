@@ -10,9 +10,11 @@ export default defineConfig(({ mode }) => {
     changeOrigin: true,
 
     configure(proxy) {
-      proxy.on('proxyReq', (proxyReq) => {
-        proxyReq.setHeader('X-AegisAI-API-Key', apiKey);
-      });
+      if (apiKey) {
+        proxy.on('proxyReq', (proxyReq) => {
+          proxyReq.setHeader('X-AegisAI-API-Key', apiKey);
+        });
+      }
     },
   };
 

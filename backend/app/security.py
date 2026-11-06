@@ -31,7 +31,7 @@ def reset_rate_limit_state() -> None:
         _rate_buckets.clear()
 
 
-def _rate_limit_response(client_key: str, path: str):
+def _rate_limit_response(client_key: str):
     if not _enabled("AEGISAI_RATE_LIMIT_ENABLED", True):
         return None
 
@@ -40,7 +40,8 @@ def _rate_limit_response(client_key: str, path: str):
     max_buckets = _positive_int("AEGISAI_RATE_LIMIT_MAX_BUCKETS", 10000)
 
     now = time.monotonic()
-    bucket_key = (client_key, path)
+    # One shared API quota per client IP, across every API route.
+    bucket_key = client_key
 
     with _rate_lock:
         bucket = _rate_buckets.get(bucket_key)
@@ -96,7 +97,7 @@ def enforce_api_security(request: Request):
     client_key = request.client.host if request.client else "unknown"
 
     # Rate limiting applies to all API routes, including BOLA/BFLA.
-    limited = _rate_limit_response(client_key, path)
+    limited = _rate_limit_response(client_key)
     if limited is not None:
         return limited
 
